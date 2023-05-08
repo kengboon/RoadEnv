@@ -7,5 +7,5 @@ from gymnasium.envs.registration import register
 def register_road_envs():
     register(
         id='urban-road-v0',
-        entry_point='road_env.envs.UrbanRoadEnv',
-        )
+        entry_point='road_env.envs:UrbanRoadEnv',
+    )
