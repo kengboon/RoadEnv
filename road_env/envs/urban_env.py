@@ -21,7 +21,7 @@ class UrbanRoadEnv(AbstractEnv):
         config = super().default_config()
         config.update({
             "observation": {
-                "type": "Kinematics"
+                "type": "Kinematics",
             },
             "action": {
                 "type": "ContinuousAction",
@@ -30,19 +30,24 @@ class UrbanRoadEnv(AbstractEnv):
                 "acceleration_range": [-6.94, 2.22], # -25 km/h/s, 8 km/h/s
                 "steering_range": [-0.5236, 0.5236], # 30 degree in radian
             },
-            "simulation_frequency": 15,
-            "policy_frequency": 5,
-            "duration": 300,
-            "collision_reward": -1,
-            "lane_centering_cost": 4,
-            "lane_centering_reward": 1,
-            "action_reward": -0.3,
+            "lanes_count": 4,
+            "vehicles_count": 50,
             "controlled_vehicles": 1,
-            "other_vehicles": 1,
-            "screen_width": 600,
-            "screen_height": 600,
-            "centering_position": [0.5, 0.5],
+            "initial_lane_id": None,
+            "duration": 40,  # [s]
+            "ego_spacing": 2,
+            "vehicles_density": 1,
+            "collision_reward": -1,    # The reward received when colliding with a vehicle.
+            "right_lane_reward": 0.1,  # The reward received when driving on the right-most lanes, linearly mapped to
+                                       # zero for other lanes.
+            "high_speed_reward": 0.4,  # The reward received when driving at full speed, linearly mapped to zero for
+                                       # lower speeds according to config["reward_speed_range"].
+            "lane_change_reward": 0,   # The reward received at each lane change action.
+            "reward_speed_range": [20, 30],
+            "normalize_reward": True,
+            "offroad_terminal": False
         })
+        return config
 
     def _reset(self) -> None:
         self._make_road()
