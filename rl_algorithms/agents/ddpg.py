@@ -34,8 +34,8 @@ class DDPGAgent:
         self.gamma = gamma
         self.tau = tau
         self.max_action = max_action
-        self.hx = torch.zero(1, hidden_size)
-        self.cx = torch.zero(1, hidden_size)
+        self.hx = torch.zeros(1, hidden_size)
+        self.cx = torch.zeros(1, hidden_size)
 
     def get_action(self, state):
         state = torch.FloatTensor(state)
