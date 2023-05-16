@@ -16,7 +16,7 @@ class Actor(nn.Module):
     def forward(self, state):
         x = F.relu(self.fc1(state))
         x = F.relu(self.fc2(x))
-        x = torch.tanh(self.fc(x)) * self.max_action
+        x = torch.tanh(self.fc3(x)) * self.max_action
         return x
     
 class Critic(nn.Module):
