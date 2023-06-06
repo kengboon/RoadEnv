@@ -2,8 +2,6 @@ from typing import Dict, Text
 from road_env.envs.common.abstract import AbstractEnv
 from road_env.envs.common.action import Action
 from road_env.road.road import Road, RoadNetwork
-from road_env.vehicle.controller import ControlledVehicle
-from road_env.vehicle.kinematics import Vehicle
 
 class UrbanRoadEnv(AbstractEnv):
     '''
@@ -22,6 +20,7 @@ class UrbanRoadEnv(AbstractEnv):
         config.update({
             "observation": {
                 "type": "Kinematics",
+                "features": ["presence", "x", "y", "vx", "vy", "heading"]
             },
             "action": {
                 "type": "ContinuousAction",
@@ -31,48 +30,64 @@ class UrbanRoadEnv(AbstractEnv):
                 "steering_range": [-0.5236, 0.5236], # 30 degree in radian
             },
             "lanes_count": 4,
-            "vehicles_count": 50,
-            "controlled_vehicles": 1,
-            "initial_lane_id": None,
+            "speed_limit": 30,
+            "initial_lane_id": 1,
             "duration": 40,  # [s]
-            "ego_spacing": 2,
-            "vehicles_density": 1,
-            "collision_reward": -1,    # The reward received when colliding with a vehicle.
-            "right_lane_reward": 0.1,  # The reward received when driving on the right-most lanes, linearly mapped to
-                                       # zero for other lanes.
-            "high_speed_reward": 0.4,  # The reward received when driving at full speed, linearly mapped to zero for
-                                       # lower speeds according to config["reward_speed_range"].
-            "lane_change_reward": 0,   # The reward received at each lane change action.
+            "collision_reward": -1,
+            "high_speed_reward": 0.5,
+            "on_road_reward": 0.1,
             "reward_speed_range": [20, 30],
             "normalize_reward": True,
-            "offroad_terminal": False
+            "offroad_terminal": True,
+            "show_trajectories": False
         })
         return config
 
     def _reset(self) -> None:
         self._make_road()
         self._make_vehicles()
+        self._make_obstacles()
+        self._make_pedestrians()
     
     def _make_road(self) -> None:
-        self.road = Road(network=RoadNetwork.straight_road_network(
+        road_network = RoadNetwork.straight_road_network(
             lanes=self.config["lanes_count"],
-            speed_limit=30
-            ),
+            speed_limit=self.config["speed_limit"]
+        )
+        self.road = Road(
+            network=road_network,
             np_random=self.np_random,
             record_history=self.config["show_trajectories"]
         )
 
     def _make_vehicles(self) -> None:
+        ego_vehicle = self.action_type.vehicle_class(
+            self.road,
+            self.road.network.get_lane(("0", "1", self.config["initial_lane_id"])).position(10, 0),
+        )
+        self.road.vehicles.append(ego_vehicle)
+        self.vehicle = ego_vehicle
+
+    def _make_obstacles(self) -> None:
         pass
+
+    def _make_pedestrians(self) -> None:
+        pass
+
+    def _reward(self, action: Action) -> float:
+        rewards = self._rewards(action)
+        reward = sum(self.config.get(name, 0) * reward for name, reward in rewards.items())
+        return reward
 
     def _rewards(self, action: Action) -> Dict[Text, float]:
         return {
-            'collision_reward': float(self.vehicle.crashed),
-            'on_road_reward': float(self.vehicle.on_road)
+            'collision_reward': self.vehicle.crashed,
+            'on_road_reward': self.vehicle.on_road
         }
 
     def _is_terminated(self) -> bool:
-        return self.vehicle.crashed
+        return (self.vehicle.crashed or
+            self.config["offroad_terminal"] and not self.vehicle.on_road)
     
     def _is_truncated(self) -> bool:
         return self.time >= self.config['duration']
