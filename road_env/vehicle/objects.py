@@ -51,6 +51,11 @@ class RoadObject(ABC):
         self.hit = False
         self.impact = np.zeros(self.position.shape)
 
+    def change_size(self, length=None, width=None):
+        self.length = length if length is not None else self.LENGTH
+        self.width = width if width is not None else self.WIDTH
+        self.diagonal = np.sqrt(self.length**2 + self.width**2)
+
     @classmethod
     def make_on_lane(cls, road: 'Road', lane_index: LaneIndex, longitudinal: float, speed: Optional[float] = None) \
             -> 'RoadObject':
