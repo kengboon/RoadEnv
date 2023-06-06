@@ -1,7 +1,10 @@
 from typing import Dict, Text
 from road_env.envs.common.abstract import AbstractEnv
 from road_env.envs.common.action import Action
+from road_env.road.graphics import RoadObjectGraphics
 from road_env.road.road import Road, RoadNetwork
+from road_env.vehicle.graphics import VehicleGraphics
+from road_env.vehicle.objects import Obstacle
 
 class UrbanRoadEnv(AbstractEnv):
     '''
@@ -65,11 +68,18 @@ class UrbanRoadEnv(AbstractEnv):
             self.road,
             self.road.network.get_lane(("0", "1", self.config["initial_lane_id"])).position(10, 0),
         )
+        ego_vehicle.color = VehicleGraphics.EGO_COLOR
         self.road.vehicles.append(ego_vehicle)
         self.vehicle = ego_vehicle
 
     def _make_obstacles(self) -> None:
-        pass
+        obstacle = Obstacle(
+            self.road,
+            self.road.network.get_lane(("0", "1", 0)).position(10, 0),
+        )
+        obstacle.change_size(5, 2)
+        obstacle.color = RoadObjectGraphics.BLUE
+        self.road.objects.append(obstacle)
 
     def _make_pedestrians(self) -> None:
         pass
