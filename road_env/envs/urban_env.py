@@ -1,3 +1,4 @@
+import random
 from typing import Dict, Text
 from road_env.envs.common.abstract import AbstractEnv
 from road_env.envs.common.action import Action
@@ -32,9 +33,12 @@ class UrbanRoadEnv(AbstractEnv):
                 "acceleration_range": [-6.94, 2.22], # -25 km/h/s, 8 km/h/s
                 "steering_range": [-0.5236, 0.5236], # 30 degree in radian
             },
+            "random_seed": 42,
             "lanes_count": 4,
             "speed_limit": 30,
             "initial_lane_id": 1,
+            "obstacle_count": 900,
+            "obstacle_size": 1.5,
             "duration": 40,  # [s]
             "collision_reward": -1,
             "high_speed_reward": 0.5,
@@ -47,10 +51,12 @@ class UrbanRoadEnv(AbstractEnv):
         return config
 
     def _reset(self) -> None:
+        random.seed(self.config["random_seed"])
         self._make_road()
         self._make_vehicles()
         self._make_obstacles()
         self._make_pedestrians()
+        random.seed()
     
     def _make_road(self) -> None:
         road_network = RoadNetwork.straight_road_network(
@@ -66,20 +72,25 @@ class UrbanRoadEnv(AbstractEnv):
     def _make_vehicles(self) -> None:
         ego_vehicle = self.action_type.vehicle_class(
             self.road,
-            self.road.network.get_lane(("0", "1", self.config["initial_lane_id"])).position(10, 0),
+            self.road.network.get_lane(("0", "1", self.config["initial_lane_id"])).position(5, 0),
         )
         ego_vehicle.color = VehicleGraphics.EGO_COLOR
         self.road.vehicles.append(ego_vehicle)
         self.vehicle = ego_vehicle
 
     def _make_obstacles(self) -> None:
-        obstacle = Obstacle(
-            self.road,
-            self.road.network.get_lane(("0", "1", 0)).position(10, 0),
-        )
-        obstacle.change_size(5, 2)
-        obstacle.color = RoadObjectGraphics.BLUE
-        self.road.objects.append(obstacle)
+        for _ in range(self.config["obstacle_count"]):
+            lane = self.road.network.get_lane(("0", "1", random.choice((0, 3))))
+            pos_x = random.randint(5, lane.end[0])
+            obstacle = Obstacle(
+                self.road,
+                lane.position(pos_x, 0),
+            )
+            width = random.random() + self.config["obstacle_size"]
+            length = width + random.random() * width
+            obstacle.change_size(length, width)
+            obstacle.color = RoadObjectGraphics.BLUE
+            self.road.objects.append(obstacle)
 
     def _make_pedestrians(self) -> None:
         pass
