@@ -36,10 +36,12 @@ class UrbanRoadEnv(AbstractEnv):
             },
             "random_seed": 42,
             "lanes_count": 4,
+            "road_length": 1000,
             "speed_limit": 16.667, # 60 km/h
             "initial_lane_id": 1,
-            "obstacle_count": 900,
+            "obstacle_count": 80,
             "obstacle_size": 1.5,
+            "pedestrian_count": 20,
             "duration": 999,  # [s]
             "collision_reward": -1,
             "on_lane_reward": 0.5,
@@ -63,6 +65,7 @@ class UrbanRoadEnv(AbstractEnv):
     def _make_road(self) -> None:
         road_network = RoadNetwork.straight_road_network(
             lanes=self.config["lanes_count"],
+            length=self.config["road_length"],
             speed_limit=self.config["speed_limit"]
         )
         self.road = Road(
@@ -95,7 +98,18 @@ class UrbanRoadEnv(AbstractEnv):
             self.road.objects.append(obstacle)
 
     def _make_pedestrians(self) -> None:
-        pass
+        self.pedestrians = []
+        for _ in range(self.config["pedestrian_count"]):
+            lane = self.road.network.get_lane(("0", "1", random.randint(0, 3)))
+            pos_x = random.randint(5, lane.end[0])
+            pedestrian = self.action_type.vehicle_class(
+                self.road,
+                position=lane.position(pos_x, 0),
+                speed=3,
+                heading=random.randint(0, 180))
+            pedestrian.color = VehicleGraphics.YELLOW
+            self.pedestrians.append(pedestrian)
+            self.road.vehicles.append(pedestrian)
 
     def _reward(self, action: Action) -> float:
         rewards = self._rewards(action)
