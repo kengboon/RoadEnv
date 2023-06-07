@@ -1,7 +1,7 @@
+import random
 from road_env.road.road import Road
 from road_env.utils import Vector
 from road_env.vehicle.kinematics import Vehicle
-from road_env.vehicle.objects import RoadObject
 
 class Pedestrian(Vehicle):
     LENGTH = 1.5
@@ -16,3 +16,9 @@ class Pedestrian(Vehicle):
         super().__init__(road, position, heading, speed, predition_type)
         self.check_collisions = False
 
+    def act(self, action: dict | str = None) -> None:
+        # TO-DO:
+        return super().act({
+            "acceleration": random.random(),
+            "steering": random.random(),
+        })
