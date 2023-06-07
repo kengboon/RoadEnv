@@ -31,14 +31,14 @@ class SACAgent:
         self.batch_size = batch_size
         self.replay_buffer = deque(maxlen=self.buffer_size)
         self.actor = actor
-        self.optimizer_actor = optim.Adam(self.actor.parameters(), lr=0.0003)
+        self.optimizer_actor = optim.Adam(self.actor.parameters(), lr=0.00001)
 
         self.critic1 = critic_1
-        self.optimizer_critic1 = optim.Adam(self.critic1.parameters(), lr=0.0003)
+        self.optimizer_critic1 = optim.Adam(self.critic1.parameters(), lr=0.00001)
         self.target_critic1 = critic_1_target
 
         self.critic2 = critic_2
-        self.optimizer_critic2 = optim.Adam(self.critic2.parameters(), lr=0.0003)
+        self.optimizer_critic2 = optim.Adam(self.critic2.parameters(), lr=0.00001)
         self.target_critic2 = critic_2_target
 
         self.target_entropy = -action_dim
