@@ -30,20 +30,22 @@ class UrbanRoadEnv(AbstractEnv):
                 "type": "ContinuousAction",
                 "longitudinal": True,
                 "lateral": True,
-                "acceleration_range": [-6.94, 2.22], # -25 km/h/s, 8 km/h/s
+                "acceleration_range": [0, 16.667], # Throtte, not acceleration
                 "steering_range": [-0.5236, 0.5236], # 30 degree in radian
+                "speed_range ": [0, 16.667] # 60 km/h
             },
             "random_seed": 42,
             "lanes_count": 4,
-            "speed_limit": 30,
+            "speed_limit": 16.667, # 60 km/h
             "initial_lane_id": 1,
             "obstacle_count": 900,
             "obstacle_size": 1.5,
-            "duration": 40,  # [s]
+            "duration": 999,  # [s]
             "collision_reward": -1,
-            "high_speed_reward": 0.5,
+            "on_lane_reward": 0.5,
             "on_road_reward": 0.1,
-            "reward_speed_range": [20, 30],
+            "speed_reward": 0.2,
+            "reward_speed_range": [13.89, 16.667, 19.17], # 50-60-69 km/h
             "normalize_reward": True,
             "offroad_terminal": True,
             "show_trajectories": False
@@ -101,10 +103,24 @@ class UrbanRoadEnv(AbstractEnv):
         return reward
 
     def _rewards(self, action: Action) -> Dict[Text, float]:
-        return {
-            'collision_reward': self.vehicle.crashed,
-            'on_road_reward': self.vehicle.on_road
+        rewards =  {
+            "collision_reward": self.vehicle.crashed,
+            "on_road_reward": self.vehicle.on_road,
+            "on_lane_reward": 0,
+            "speed_reward": 0
         }
+        # On-lane reward if no collision
+        if not self.vehicle.crashed:
+            pass
+        
+        # Speed reward if no collision
+        if not self.vehicle.crashed:
+            low_speed, desired_speed, high_speed = self.config["reward_speed_range"]
+            if low_speed <= self.vehicle.speed <= high_speed:
+                speed_tolerance = max(abs(desired_speed - low_speed), abs(desired_speed - high_speed))
+                speed_diff = abs(self.vehicle.speed - desired_speed)
+                rewards["speed_reward"] = speed_diff / speed_tolerance
+        return rewards
 
     def _is_terminated(self) -> bool:
         return (self.vehicle.crashed or
