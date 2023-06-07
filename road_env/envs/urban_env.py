@@ -33,7 +33,6 @@ class UrbanRoadEnv(AbstractEnv):
                 "lateral": True,
                 "acceleration_range": [0, 2.2222], # 8 km/h/s
                 "steering_range": [-0.5236, 0.5236], # 30 degree in radian
-                "dynamical": True,
                 "speed_range ": [0, 16.667] # 60 km/h
             },
             "random_seed": 42,
@@ -110,7 +109,6 @@ class UrbanRoadEnv(AbstractEnv):
                 position=lane.position(pos_x, 0),
                 speed=3,
                 heading=random.randint(0, 180))
-            pedestrian.color = VehicleGraphics.YELLOW
             self.pedestrians.append(pedestrian)
             self.road.vehicles.append(pedestrian)
 
