@@ -302,6 +302,7 @@ class Road(object):
         self.network = network
         self.vehicles = vehicles or []
         self.objects = road_objects or []
+        self.pedestrians = []
         self.np_random = np_random if np_random else np.random.RandomState()
         self.record_history = record_history
 
