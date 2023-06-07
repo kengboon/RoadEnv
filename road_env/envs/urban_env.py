@@ -42,8 +42,17 @@ class UrbanRoadEnv(AbstractEnv):
             "initial_lane_id": 1,
             "obstacle_count": 80,
             "obstacle_size": 1.5,
-            "pedestrian_count": 20,
-            "pedestrian_speed": [0, 1],
+            "pedestrians": {
+                "count": 20,
+                "action": {
+                    "type": "ContinuousAction",
+                    "longitudinal": True,
+                    "lateral": True,
+                    "acceleration_range": [0, 0.1],
+                    "steering_range": [-3.14, 3.14], # 180 degree in radian
+                    "speed_range ": [0, 0.83] # 3 km/h
+                }
+            },
             "duration": 999,  # [s]
             "collision_reward": -1,
             "on_lane_reward": 0.5,
@@ -100,8 +109,7 @@ class UrbanRoadEnv(AbstractEnv):
             self.road.objects.append(obstacle)
 
     def _make_pedestrians(self) -> None:
-        self.pedestrians = []
-        for _ in range(self.config["pedestrian_count"]):
+        for _ in range(self.config["pedestrians"]["count"]):
             lane = self.road.network.get_lane(("0", "1", random.randint(0, 3)))
             pos_x = random.randint(5, lane.end[0])
             pedestrian = Pedestrian(
@@ -109,8 +117,10 @@ class UrbanRoadEnv(AbstractEnv):
                 position=lane.position(pos_x, 0),
                 speed=3,
                 heading=random.randint(0, 180))
-            self.pedestrians.append(pedestrian)
+            pedestrian.configure(self, self.config["pedestrians"])
+            self.road.pedestrians.append(pedestrian)
             self.road.vehicles.append(pedestrian)
+        self.pedestrians = self.road.pedestrians
 
     def _reward(self, action: Action) -> float:
         rewards = self._rewards(action)
@@ -118,7 +128,7 @@ class UrbanRoadEnv(AbstractEnv):
         return reward
 
     def _rewards(self, action: Action) -> Dict[Text, float]:
-        rewards =  {
+        rewards = {
             "collision_reward": self.vehicle.crashed,
             "on_road_reward": self.vehicle.on_road,
             "on_lane_reward": 0,
