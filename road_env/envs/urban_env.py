@@ -5,6 +5,7 @@ from road_env.envs.common.action import Action
 from road_env.road.graphics import RoadObjectGraphics
 from road_env.road.road import Road, RoadNetwork
 from road_env.vehicle.graphics import VehicleGraphics
+from road_env.vehicle.human import Pedestrian
 from road_env.vehicle.objects import Obstacle
 
 class UrbanRoadEnv(AbstractEnv):
@@ -30,8 +31,9 @@ class UrbanRoadEnv(AbstractEnv):
                 "type": "ContinuousAction",
                 "longitudinal": True,
                 "lateral": True,
-                "acceleration_range": [0, 16.667], # Throtte, not acceleration
+                "acceleration_range": [0, 2.2222], # 8 km/h/s
                 "steering_range": [-0.5236, 0.5236], # 30 degree in radian
+                "dynamical": True,
                 "speed_range ": [0, 16.667] # 60 km/h
             },
             "random_seed": 42,
@@ -42,6 +44,7 @@ class UrbanRoadEnv(AbstractEnv):
             "obstacle_count": 80,
             "obstacle_size": 1.5,
             "pedestrian_count": 20,
+            "pedestrian_speed": [0, 1],
             "duration": 999,  # [s]
             "collision_reward": -1,
             "on_lane_reward": 0.5,
@@ -102,7 +105,7 @@ class UrbanRoadEnv(AbstractEnv):
         for _ in range(self.config["pedestrian_count"]):
             lane = self.road.network.get_lane(("0", "1", random.randint(0, 3)))
             pos_x = random.randint(5, lane.end[0])
-            pedestrian = self.action_type.vehicle_class(
+            pedestrian = Pedestrian(
                 self.road,
                 position=lane.position(pos_x, 0),
                 speed=3,

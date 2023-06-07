@@ -6,6 +6,7 @@ import pygame
 
 from road_env.utils import Vector
 from road_env.vehicle.dynamics import BicycleVehicle
+from road_env.vehicle.human import Pedestrian
 from road_env.vehicle.kinematics import Vehicle
 from road_env.vehicle.controller import ControlledVehicle, MDPVehicle
 from road_env.vehicle.behavior import IDMVehicle, LinearVehicle
@@ -66,7 +67,10 @@ class VehicleGraphics(object):
                                 surface.pix(headlight_length),
                                 surface.pix(headlight_width))
         color = cls.get_color(v, transparent)
-        pygame.draw.rect(vehicle_surface, color, rect, 0)
+        if type(vehicle) is Pedestrian:
+            pygame.draw.ellipse(vehicle_surface, color, rect, 0)
+        else:
+            pygame.draw.rect(vehicle_surface, color, rect, 0)
         pygame.draw.rect(vehicle_surface, cls.lighten(color), rect_headlight_left, 0)
         pygame.draw.rect(vehicle_surface, cls.lighten(color), rect_headlight_right, 0)
         if draw_roof:
