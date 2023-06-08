@@ -28,6 +28,9 @@ print('# Observation space', env.observation_space.shape)
 print(env.observation_space.sample())
 
 env.configure({
+    "screen_width": 1200,
+    "screen_height": 500,
+    "scaling": 7.5,
     "random_seed": 10,
     "duration": 60, # Maximum duration (s) per episode
 })
