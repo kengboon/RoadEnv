@@ -31,9 +31,9 @@ class UrbanRoadEnv(AbstractEnv):
                 "type": "ContinuousAction",
                 "longitudinal": True,
                 "lateral": True,
-                "acceleration_range": [0, 2.222], # 8 km/h/s
+                "acceleration_range": [-6.944, 2.778], # -25 km/h/s - 10 km/h/s
                 "steering_range": [-0.524, 0.524], # 30 degree in radian
-                "speed_range ": [0, 16.667] # 60 km/h
+                "speed_range": [0, 22.222] # 80 km/h
             },
             "random_seed": 42,
             "lanes_count": 4,
@@ -48,9 +48,9 @@ class UrbanRoadEnv(AbstractEnv):
                     "type": "ContinuousAction",
                     "longitudinal": True,
                     "lateral": True,
-                    "acceleration_range": [0, 0.05],
+                    "acceleration_range": [-0.833, 0.5], # -3 km/h/s - 
                     "steering_range": [-0.524, 0.524], # 30 degree in radian
-                    "speed_range ": [0, 0.278] # 1 km/h
+                    "speed_range": [0, 0.833] # 3 km/h
                 }
             },
             "duration": 999,  # [s]
