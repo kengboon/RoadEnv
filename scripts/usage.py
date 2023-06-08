@@ -21,7 +21,6 @@ register_road_envs()
 # %% Make environment
 env = gym.make('urban-road-v0', render_mode='rgb_array')
 
-
 print('# Action space ', env.action_space.shape)
 print(env.action_space.sample())
 
@@ -41,11 +40,13 @@ plt.imshow(env.render())
 num_episodes = 20
 for episode in range(num_episodes):
     print('Episode', episode+1)
+    num_steps = 0
     episode_reward = 0
 
     while True: # Use config["duration"] to truncate
         action = env.action_space.sample()
         obs, reward, done, truncated, info = env.step(action)
+        num_steps += 1
         env.render() # Note: Do not render during training
 
         episode_reward += reward
@@ -54,6 +55,6 @@ for episode in range(num_episodes):
             obs, info = env.reset()
             break
 
-    print('Reward', episode_reward)
+    print('Total steps:', num_steps, ', Total reward:', episode_reward)
 
 env.close()
