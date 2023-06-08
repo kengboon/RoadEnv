@@ -31,8 +31,8 @@ class UrbanRoadEnv(AbstractEnv):
                 "type": "ContinuousAction",
                 "longitudinal": True,
                 "lateral": True,
-                "acceleration_range": [0, 2.2222], # 8 km/h/s
-                "steering_range": [-0.5236, 0.5236], # 30 degree in radian
+                "acceleration_range": [0, 2.222], # 8 km/h/s
+                "steering_range": [-0.524, 0.524], # 30 degree in radian
                 "speed_range ": [0, 16.667] # 60 km/h
             },
             "random_seed": 42,
@@ -48,9 +48,9 @@ class UrbanRoadEnv(AbstractEnv):
                     "type": "ContinuousAction",
                     "longitudinal": True,
                     "lateral": True,
-                    "acceleration_range": [0, 0.1],
-                    "steering_range": [-3.14, 3.14], # 180 degree in radian
-                    "speed_range ": [0, 0.83] # 3 km/h
+                    "acceleration_range": [0, 0.05],
+                    "steering_range": [-0.524, 0.524], # 30 degree in radian
+                    "speed_range ": [0, 0.278] # 1 km/h
                 }
             },
             "duration": 999,  # [s]
@@ -58,7 +58,7 @@ class UrbanRoadEnv(AbstractEnv):
             "on_lane_reward": 0.5,
             "on_road_reward": 0.1,
             "speed_reward": 0.2,
-            "reward_speed_range": [13.89, 16.667, 19.17], # 50-60-69 km/h
+            "reward_speed_range": [13.889, 16.667, 19.167], # 50-60-69 km/h
             "normalize_reward": True,
             "offroad_terminal": True,
             "show_trajectories": False
@@ -110,14 +110,22 @@ class UrbanRoadEnv(AbstractEnv):
 
     def _make_pedestrians(self) -> None:
         for _ in range(self.config["pedestrians"]["count"]):
-            lane = self.road.network.get_lane(("0", "1", random.randint(0, 3)))
+            lane_index = random.randint(0, self.config["lanes_count"]-1)
+            lane = self.road.network.get_lane(("0", "1", lane_index))
             pos_x = random.randint(5, lane.end[0])
+            if lane_index <= self.config["lanes_count"] / 2:
+                heading = 1.05 + random.random() * 1.05
+            else:
+                heading = -1.05 - random.random() * 1.05
+            target_lane = self.config["lanes_count"]-1
             pedestrian = Pedestrian(
                 self.road,
                 position=lane.position(pos_x, 0),
                 speed=3,
-                heading=random.randint(0, 180))
+                heading=heading)
             pedestrian.configure(self, self.config["pedestrians"])
+            pedestrian.target_lane = target_lane
+            pedestrian.others.append(self.vehicle)
             self.road.pedestrians.append(pedestrian)
             self.road.vehicles.append(pedestrian)
         self.pedestrians = self.road.pedestrians

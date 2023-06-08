@@ -1,3 +1,4 @@
+import random
 from road_env.envs.common.action import action_factory
 from road_env.road.road import Road
 from road_env.utils import Vector
@@ -16,6 +17,8 @@ class Pedestrian(Vehicle):
                  predition_type: str = 'constant_steering'):
         super().__init__(road, position, heading, speed, predition_type)
         self.check_collisions = False
+        self.target_lane = 0
+        self.others = []
 
     def configure(self, env, config):
         self.env = env
@@ -27,8 +30,20 @@ class Pedestrian(Vehicle):
         return
 
     def act(self, action: dict | str = None) -> None:
-        action = self.action_space.sample()
+        acceleration, steering = self.action_space.sample()
+
+        if any(abs(self.front_distance_to(other)) < self.LENGTH * self.WIDTH for other in self.others):
+            acceleration = 0
+
+        if self.lane_index[2] in (0, self.target_lane):
+            # Scale up the steering action
+            # thus increase chance of a u-turn
+            if 0.25 <= steering < 0.5:
+                steering += 0.5
+            elif -0.5 > steering >= 0.25:
+                steering -= 0.5
+
         return super().act({
-            "acceleration": action[0],
-            "steering": action[1],
+            "acceleration": acceleration,
+            "steering": steering,
         })

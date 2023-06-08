@@ -140,11 +140,14 @@ class RoadObject(ABC):
         return self.speed * self.direction
 
     def polygon(self) -> np.ndarray:
+        length = self.length if getattr(self, "length", None) else self.LENGTH
+        width = self.width if getattr(self, "width", None) else self.WIDTH
+
         points = np.array([
-            [-self.LENGTH / 2, -self.WIDTH / 2],
-            [-self.LENGTH / 2, +self.WIDTH / 2],
-            [+self.LENGTH / 2, +self.WIDTH / 2],
-            [+self.LENGTH / 2, -self.WIDTH / 2],
+            [-length / 2, -width / 2],
+            [-length / 2, +width / 2],
+            [+length / 2, +width / 2],
+            [+length / 2, -width / 2],
         ]).T
         c, s = np.cos(self.heading), np.sin(self.heading)
         rotation = np.array([
