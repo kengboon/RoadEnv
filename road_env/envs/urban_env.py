@@ -30,6 +30,7 @@ class UrbanRoadEnv(AbstractEnv):
                 "cells": 16,
                 "maximum_range": 60,
                 "see_behind": False,
+                "observe_angle": [-1.57, 1.57], # -90 deg - +90 deg
                 "display_line": True,
                 "display_unobserved": True
             },

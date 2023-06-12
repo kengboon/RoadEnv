@@ -641,6 +641,7 @@ class LidarKinematicsObservation(ObservationType):
                  features: Optional[List[str]] = None,
                  features_range: Dict[str, List[float]] = None,                 
                  see_behind: bool = False,
+                 observe_angle: List[float] = [-1.57, 1.57],
                  see_offroad: bool = True,
                  clip: bool = True,
                  observe_intentions: bool = False,
@@ -660,6 +661,7 @@ class LidarKinematicsObservation(ObservationType):
         self.clip = clip
         self.see_behind = see_behind
         self.see_offroad = see_offroad
+        self.observe_angle = observe_angle
         self.observe_intentions = observe_intentions
         self.display_grid = display_grid
         self.display_line = display_line
@@ -694,7 +696,7 @@ class LidarKinematicsObservation(ObservationType):
 
             for obstacle in close_obstacles:
                 # Determine obstruction
-                center_angle = self.position_to_angle(obstacle.position, origin)
+                center_angle = obstacle.observed_angle
                 center_index = self.angle_to_index(center_angle)
                 center_distance = np.linalg.norm(obstacle.position - origin)
                 distance = center_distance - obstacle.WIDTH / 2
@@ -731,7 +733,7 @@ class LidarKinematicsObservation(ObservationType):
         vehicles = [v for v in self.env.road.vehicles + self.env.road.objects
                      if np.linalg.norm(v.position - observer_vehicle.position) < distance
                      and v is not observer_vehicle
-                     and (self.see_behind or -2 * observer_vehicle.LENGTH < observer_vehicle.lane_distance_to(v))]
+                     and (self.observe_angle[0] <= self.put_observe_angle(v) <= self.observe_angle[1])]
         if sort:
             vehicles = sorted(vehicles, key = lambda v: np.linalg.norm(v.position - observer_vehicle.position))
         if count:
@@ -755,6 +757,10 @@ class LidarKinematicsObservation(ObservationType):
                 if self.clip:
                     df[feature] = np.clip(df[feature], -1, 1)
         return df
+
+    def put_observe_angle(self, obstacle):
+        obstacle.observed_angle = self.position_to_angle(obstacle.position, self.observer_vehicle.position)
+        return obstacle.observed_angle
 
     def position_to_angle(self, position: np.ndarray, origin: np.ndarray) -> float:
         return np.arctan2(position[1] - origin[1], position[0] - origin[0])# + self.angle/2
