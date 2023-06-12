@@ -1,4 +1,3 @@
-import random
 from typing import Dict, Text
 import numpy as np
 from road_env import utils
@@ -68,13 +67,13 @@ class UrbanRoadEnv(AbstractEnv):
         return config
 
     def _reset(self) -> None:
-        random.seed(self.config["random_seed"])
+        seed_seq = np.random.SeedSequence(self.config["random_seed"])
+        self._generator = np.random.Generator(np.random.PCG64(seed_seq))
         self._make_road()
         self._make_vehicles()
         self._make_obstacles()
         self._make_pedestrians()
-        random.seed()
-    
+
     def _make_road(self) -> None:
         road_network = RoadNetwork.straight_road_network(
             lanes=self.config["lanes_count"],
@@ -99,27 +98,27 @@ class UrbanRoadEnv(AbstractEnv):
 
     def _make_obstacles(self) -> None:
         for _ in range(self.config["obstacle_count"]):
-            lane = self.road.network.get_lane(("0", "1", random.choice((0, 3))))
-            pos_x = random.randint(5, lane.end[0])
+            lane = self.road.network.get_lane(("0", "1", self._generator.choice((0, 3))))
+            pos_x = self._generator.integers(5, lane.end[0])
             obstacle = Obstacle(
                 self.road,
                 lane.position(pos_x, 0),
             )
-            width = random.random() + self.config["obstacle_size"]
-            length = width + random.random() * width
+            width = self._generator.random() + self.config["obstacle_size"]
+            length = width + self._generator.random() * width
             obstacle.change_size(length, width)
             obstacle.color = RoadObjectGraphics.BLUE
             self.road.objects.append(obstacle)
 
     def _make_pedestrians(self) -> None:
         for _ in range(self.config["pedestrians"]["count"]):
-            lane_index = random.randint(0, self.config["lanes_count"]-1)
+            lane_index = self._generator.integers(0, self.config["lanes_count"]-1)
             lane = self.road.network.get_lane(("0", "1", lane_index))
-            pos_x = random.randint(5, lane.end[0])
+            pos_x = self._generator.integers(5, lane.end[0])
             if lane_index <= self.config["lanes_count"] / 2:
-                heading = 1.05 + random.random() * 1.05
+                heading = 1.05 + self._generator.random() * 1.05
             else:
-                heading = -1.05 - random.random() * 1.05
+                heading = -1.05 - self._generator.random() * 1.05
             target_lane = self.config["lanes_count"]-1
             pedestrian = Pedestrian(
                 self.road,
