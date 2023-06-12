@@ -114,10 +114,12 @@ class RoadObject(ABC):
     def to_dict(self, origin_vehicle=None, observe_intentions=True):
         d = {
             'presence': 1,
+            'class': 0,
             'x': self.position[0],
             'y': self.position[1],
             'vx': 0.,
             'vy': 0.,
+            'heading': self.heading,
             'cos_h': np.cos(self.heading),
             'sin_h': np.sin(self.heading),
             'cos_d': 0.,
@@ -194,6 +196,11 @@ class Obstacle(RoadObject):
         super().__init__(road, position, heading, speed)
         self.solid = True
         self.check_collisions = False
+
+    def to_dict(self, origin_vehicle=None, observe_intentions=True):
+        d = super().to_dict(origin_vehicle, observe_intentions)
+        d['class'] = .5
+        return d
 
 class Landmark(RoadObject):
 

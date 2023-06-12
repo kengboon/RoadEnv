@@ -203,6 +203,7 @@ class Vehicle(RoadObject):
     def to_dict(self, origin_vehicle: "Vehicle" = None, observe_intentions: bool = True) -> dict:
         d = {
             'presence': 1,
+            'class': 0,
             'x': self.position[0],
             'y': self.position[1],
             'vx': self.velocity[0],

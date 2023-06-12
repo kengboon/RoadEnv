@@ -43,3 +43,8 @@ class Pedestrian(Vehicle):
             "acceleration": acceleration,
             "steering": steering,
         })
+
+    def to_dict(self, origin_vehicle: Vehicle = None, observe_intentions: bool = True) -> dict:
+        d = super().to_dict(origin_vehicle, observe_intentions)
+        d['class'] = 1
+        return d
