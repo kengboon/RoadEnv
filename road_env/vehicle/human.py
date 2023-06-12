@@ -1,4 +1,3 @@
-import random
 from road_env.envs.common.action import action_factory
 from road_env.road.road import Road
 from road_env.utils import Vector
@@ -25,9 +24,6 @@ class Pedestrian(Vehicle):
         self.config = config
         self.action_type = action_factory(env, config["action"])
         self.action_space = self.action_type.space()
-
-    def handle_collisions(self, other: RoadObject, dt: float = 0) -> None:
-        return
 
     def act(self, action: dict | str = None) -> None:
         acceleration, steering = self.action_space.sample()
