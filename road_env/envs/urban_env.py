@@ -27,11 +27,11 @@ class UrbanRoadEnv(AbstractEnv):
             "observation": {
                 "type": "LidarKinematicsObservation",
                 "features": ["class", "x", "y", "vx", "vy", "heading"],
-                "obstacle_count": 6,
                 "cells": 16,
-                "maximum_range": 20,
-                "display_grid": False,
+                "maximum_range": 60,
                 "see_behind": False,
+                "display_line": True,
+                "display_unobserved": True
             },
             "action": {
                 "type": "ContinuousAction",

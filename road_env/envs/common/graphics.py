@@ -216,13 +216,16 @@ class EventHandler(object):
 
 
 class ObservationGraphics(object):
-    COLOR = (250, 0, 0)
+    COLOR = (0, 0, 0)
 
     @classmethod
     def display(cls, obs, sim_surface):
         from road_env.envs.common.observation import LidarObservation, LidarKinematicsObservation
-        if isinstance(obs, LidarKinematicsObservation) and obs.display_grid:
-            cls.display_grid(obs.lidar_obs, sim_surface)
+        if isinstance(obs, LidarKinematicsObservation):
+            if obs.display_grid:
+                cls.display_grid(obs.lidar_obs, sim_surface)
+            if obs.display_line:
+                cls.display_line(obs, sim_surface)
         elif isinstance(obs, LidarObservation):
             cls.display_grid(obs, sim_surface)
 
@@ -236,4 +239,18 @@ class ObservationGraphics(object):
         points = [(surface.pos2pix(lidar_observation.origin[0] + r[i] * np.cos(psi[i]),
                                    lidar_observation.origin[1] + r[i] * np.sin(psi[i])))
                   for i in range(np.size(psi))]
-        pygame.draw.lines(surface, ObservationGraphics.COLOR, True, points, 2)
+        pygame.draw.lines(surface, ObservationGraphics.COLOR, True, points, 1)
+
+    RED = (255, 0, 0)
+    GREEN = (0, 255, 0)
+
+    @classmethod
+    def display_line(cls, obs, surface):
+        origin = surface.pos2pix(obs.observer_vehicle.position[0], obs.observer_vehicle.position[1])
+        if obs.display_unobserved:
+            for obstacle in obs.unobserved:
+                dest = surface.pos2pix(obstacle.position[0], obstacle.position[1])
+                pygame.draw.line(surface, ObservationGraphics.RED, origin, dest)
+        for obstacle in obs.observed:
+            dest = surface.pos2pix(obstacle.position[0], obstacle.position[1])
+            pygame.draw.line(surface, ObservationGraphics.GREEN, origin, dest)

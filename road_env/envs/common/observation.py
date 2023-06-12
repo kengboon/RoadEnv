@@ -645,7 +645,9 @@ class LidarKinematicsObservation(ObservationType):
                  clip: bool = True,
                  observe_intentions: bool = False,
                  normalize: bool = True,
-                 display_grid: bool = True,
+                 display_grid: bool = False,
+                 display_line: bool = True,
+                 display_unobserved: bool = False,
                  **kwargs: dict) -> None:
         super().__init__(env, **kwargs)
         self.lidar_obs = LidarObservation(env, cells=cells, maximum_range=maximum_range, see_behind=see_behind, **kwargs)
@@ -660,9 +662,20 @@ class LidarKinematicsObservation(ObservationType):
         self.see_offroad = see_offroad
         self.observe_intentions = observe_intentions
         self.display_grid = display_grid
+        self.display_line = display_line
+        self.display_unobserved = display_unobserved
+        self.angle = np.pi / self.cells
+        if self.see_behind:
+            self.angle *= 2
+        self.reset_observations()
 
     def space(self) -> spaces.Space:
         return spaces.Box(shape=(self.cells, len(self.features)), low=np.inf, high=np.inf, dtype=np.float32)
+
+    def reset_observations(self):
+        self.observed = []
+        self.unobserved = []
+        self.grid = [(None, None) for v in range(self.cells)]
 
     def observe(self) -> np.ndarray:
         if self.display_grid:
@@ -671,15 +684,33 @@ class LidarKinematicsObservation(ObservationType):
         # Add ego-vehicle
         df = pd.DataFrame.from_records([self.observer_vehicle.to_dict()])[self.features]
         # Add nearby traffic & obstacles
+        self.reset_observations()
         close_obstacles = self.close_obstacles_to(self.observer_vehicle,
                                                   distance=self.maximum_range,
                                                   count=self.vehicles_count-1,
                                                   see_behind=self.see_behind)
         if close_obstacles:
-            origin = self.observer_vehicle
+            origin = self.observer_vehicle.position
+
+            for obstacle in close_obstacles:
+                # Determine obstruction
+                center_angle = self.position_to_angle(obstacle.position, origin)
+                center_index = self.angle_to_index(center_angle)
+                center_distance = np.linalg.norm(obstacle.position - origin)
+                distance = center_distance - obstacle.WIDTH / 2
+                if self.grid[center_index][0] is None or distance < self.grid[center_index][0]:
+                    if self.grid[center_index][1] is not None:
+                        # Move to unobserved
+                        self.unobserved.append(self.grid[center_index][1])
+                        self.observed.remove(self.grid[center_index][1])
+                    self.grid[center_index] = (distance, obstacle)
+                    self.observed.append(obstacle)
+                else:
+                    self.unobserved.append(obstacle)
+
             df = pd.concat([df, pd.DataFrame.from_records(
-                [v.to_dict(origin, observe_intentions=self.observe_intentions)
-                 for v in close_obstacles])[self.features]],
+                [v.to_dict(self.observer_vehicle, observe_intentions=self.observe_intentions)
+                 for v in self.observed])[self.features]],
                            ignore_index=True)
         # Normalize and clip
         if self.normalize:
@@ -724,6 +755,12 @@ class LidarKinematicsObservation(ObservationType):
                 if self.clip:
                     df[feature] = np.clip(df[feature], -1, 1)
         return df
+
+    def position_to_angle(self, position: np.ndarray, origin: np.ndarray) -> float:
+        return np.arctan2(position[1] - origin[1], position[0] - origin[0]) + self.angle/2
+
+    def angle_to_index(self, angle: float) -> int:
+        return int(np.floor(angle / self.angle)) % self.cells
 
 def observation_factory(env: 'AbstractEnv', config: dict) -> ObservationType:
     if config["type"] == "TimeToCollision":
