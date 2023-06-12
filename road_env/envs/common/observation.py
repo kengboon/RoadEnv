@@ -553,6 +553,7 @@ class LidarObservation(ObservationType):
                  cells: int = 16,
                  maximum_range: float = 60,
                  normalize: bool = True,
+                 see_behind: bool = True,
                  **kwargs):
         super().__init__(env, **kwargs)
         self.cells = cells
@@ -561,6 +562,7 @@ class LidarObservation(ObservationType):
         self.angle = 2 * np.pi / self.cells
         self.grid = np.ones((self.cells, 1)) * float('inf')
         self.origin = None
+        self.see_behind = see_behind
 
     def space(self) -> spaces.Space:
         high = 1 if self.normalize else self.maximum_range
@@ -582,6 +584,10 @@ class LidarObservation(ObservationType):
             center_distance = np.linalg.norm(obstacle.position - origin)
             if center_distance > self.maximum_range:
                 continue
+
+            if obstacle.position[0] < origin[0] and not self.see_behind:
+                continue
+
             center_angle = self.position_to_angle(obstacle.position, origin)
             center_index = self.angle_to_index(center_angle)
             distance = center_distance - obstacle.WIDTH / 2
@@ -622,6 +628,102 @@ class LidarObservation(ObservationType):
     def index_to_direction(self, index: int) -> np.ndarray:
         return np.array([np.cos(index * self.angle), np.sin(index * self.angle)])
 
+class LidarKinematicsObservation(ObservationType):
+    FEATURES: List[str] = ['presence', 'x', 'y', 'vx', 'vy']
+    DISTANCE = 0
+    SPEED = 1
+
+    def __init__(self,
+                 env: 'AbstractEnv',
+                 cells: int = 16,
+                 obstacle_count: int = 8,
+                 maximum_range: float = 60,
+                 features: Optional[List[str]] = None,
+                 features_range: Dict[str, List[float]] = None,                 
+                 see_behind: bool = False,
+                 see_offroad: bool = True,
+                 clip: bool = True,
+                 observe_intentions: bool = False,
+                 normalize: bool = True,
+                 display_grid: bool = True,
+                 **kwargs: dict) -> None:
+        super().__init__(env, **kwargs)
+        self.lidar_obs = LidarObservation(env, cells=cells, maximum_range=maximum_range, see_behind=see_behind, **kwargs)
+        self.features = features or self.FEATURES
+        self.features_range = features_range
+        self.vehicles_count = obstacle_count
+        self.cells = cells
+        self.maximum_range = maximum_range
+        self.normalize = normalize
+        self.clip = clip
+        self.see_behind = see_behind
+        self.see_offroad = see_offroad
+        self.observe_intentions = observe_intentions
+        self.display_grid = display_grid
+
+    def space(self) -> spaces.Space:
+        return spaces.Box(shape=(self.cells, len(self.features)), low=np.inf, high=np.inf, dtype=np.float32)
+
+    def observe(self) -> np.ndarray:
+        if self.display_grid:
+            obs = self.lidar_obs.observe()
+
+        # Add ego-vehicle
+        df = pd.DataFrame.from_records([self.observer_vehicle.to_dict()])[self.features]
+        # Add nearby traffic & obstacles
+        close_obstacles = self.close_obstacles_to(self.observer_vehicle,
+                                                  distance=self.maximum_range,
+                                                  count=self.vehicles_count-1,
+                                                  see_behind=self.see_behind)
+        if close_obstacles:
+            origin = self.observer_vehicle
+            df = pd.concat([df, pd.DataFrame.from_records(
+                [v.to_dict(origin, observe_intentions=self.observe_intentions)
+                 for v in close_obstacles])[self.features]],
+                           ignore_index=True)
+        # Normalize and clip
+        if self.normalize:
+            df = self.normalize_obs(df)
+        # Fill missing rows
+        if df.shape[0] < self.vehicles_count:
+            rows = np.zeros((self.vehicles_count - df.shape[0], len(self.features)))
+            df = pd.concat([df, pd.DataFrame(data=rows, columns=self.features)], ignore_index=True)
+        # Reorder
+        df = df[self.features]
+        obs = df.values.copy()
+        # Flatten
+        return np.nan_to_num(obs).astype(self.space().dtype)
+
+    def close_obstacles_to(self, observer_vehicle, distance: Optional[float] = None, count: Optional[int] = None,
+                           see_behind: bool = True, sort: bool = True) -> object:
+        distance = distance or self.env.PERCEPTION_DISTANCE
+        vehicles = [v for v in self.env.road.vehicles + self.env.road.objects
+                     if np.linalg.norm(v.position - observer_vehicle.position) < distance
+                     and v is not observer_vehicle
+                     and (self.see_behind or -2 * observer_vehicle.LENGTH < observer_vehicle.lane_distance_to(v))]
+        if sort:
+            vehicles = sorted(vehicles, key = lambda v: np.linalg.norm(v.position - observer_vehicle.position))
+        if count:
+            vehicles = vehicles[:count]
+        return vehicles
+    
+    def normalize_obs(self, df: pd.DataFrame) -> pd.DataFrame:
+        if not self.features_range:
+            side_lanes = self.env.road.network.all_side_lanes(self.observer_vehicle.lane_index)
+            self.features_range = {
+                "class": [0, 1],
+                "x": [-5.0 * Vehicle.MAX_SPEED, 5.0 * Vehicle.MAX_SPEED],
+                "y": [-AbstractLane.DEFAULT_WIDTH * len(side_lanes), AbstractLane.DEFAULT_WIDTH * len(side_lanes)],
+                "vx": [-2*Vehicle.MAX_SPEED, 2*Vehicle.MAX_SPEED],
+                "vy": [-2*Vehicle.MAX_SPEED, 2*Vehicle.MAX_SPEED],
+                "heading": [-3.142, 3.142]
+            }
+        for feature, f_range in self.features_range.items():
+            if feature in df:
+                df[feature] = utils.lmap(df[feature], [f_range[0], f_range[1]], [-1, 1])
+                if self.clip:
+                    df[feature] = np.clip(df[feature], -1, 1)
+        return df
 
 def observation_factory(env: 'AbstractEnv', config: dict) -> ObservationType:
     if config["type"] == "TimeToCollision":
@@ -644,5 +746,7 @@ def observation_factory(env: 'AbstractEnv', config: dict) -> ObservationType:
         return LidarObservation(env, **config)
     elif config["type"] == "ExitObservation":
         return ExitObservation(env, **config)
+    elif config["type"] == "LidarKinematicsObservation":
+        return LidarKinematicsObservation(env, **config)
     else:
         raise ValueError("Unknown observation type")

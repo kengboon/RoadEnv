@@ -25,8 +25,13 @@ class UrbanRoadEnv(AbstractEnv):
         config = super().default_config()
         config.update({
             "observation": {
-                "type": "Kinematics",
-                "features": ["presence", "x", "y", "vx", "vy", "heading"]
+                "type": "LidarKinematicsObservation",
+                "features": ["class", "x", "y", "vx", "vy", "heading"],
+                "obstacle_count": 6,
+                "cells": 16,
+                "maximum_range": 20,
+                "display_grid": False,
+                "see_behind": False,
             },
             "action": {
                 "type": "ContinuousAction",
@@ -89,7 +94,7 @@ class UrbanRoadEnv(AbstractEnv):
     def _make_vehicles(self) -> None:
         ego_vehicle = self.action_type.vehicle_class(
             self.road,
-            self.road.network.get_lane(("0", "1", self.config["initial_lane_id"])).position(5, 0),
+            self.road.network.get_lane(("0", "1", self.config["initial_lane_id"])).position(200, 0),
         )
         ego_vehicle.color = VehicleGraphics.EGO_COLOR
         self.road.vehicles.append(ego_vehicle)

@@ -216,12 +216,14 @@ class EventHandler(object):
 
 
 class ObservationGraphics(object):
-    COLOR = (0, 0, 0)
+    COLOR = (250, 0, 0)
 
     @classmethod
     def display(cls, obs, sim_surface):
-        from road_env.envs.common.observation import LidarObservation
-        if isinstance(obs, LidarObservation):
+        from road_env.envs.common.observation import LidarObservation, LidarKinematicsObservation
+        if isinstance(obs, LidarKinematicsObservation) and obs.display_grid:
+            cls.display_grid(obs.lidar_obs, sim_surface)
+        elif isinstance(obs, LidarObservation):
             cls.display_grid(obs, sim_surface)
 
     @classmethod
@@ -234,4 +236,4 @@ class ObservationGraphics(object):
         points = [(surface.pos2pix(lidar_observation.origin[0] + r[i] * np.cos(psi[i]),
                                    lidar_observation.origin[1] + r[i] * np.sin(psi[i])))
                   for i in range(np.size(psi))]
-        pygame.draw.lines(surface, ObservationGraphics.COLOR, True, points, 1)
+        pygame.draw.lines(surface, ObservationGraphics.COLOR, True, points, 2)
