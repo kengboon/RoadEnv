@@ -636,7 +636,6 @@ class LidarKinematicsObservation(ObservationType):
     def __init__(self,
                  env: 'AbstractEnv',
                  cells: int = 16,
-                 obstacle_count: int = 8,
                  maximum_range: float = 60,
                  features: Optional[List[str]] = None,
                  features_range: Dict[str, List[float]] = None,                 
@@ -654,7 +653,6 @@ class LidarKinematicsObservation(ObservationType):
         self.lidar_obs = LidarObservation(env, cells=cells, maximum_range=maximum_range, see_behind=see_behind, **kwargs)
         self.features = features or self.FEATURES
         self.features_range = features_range
-        self.vehicles_count = obstacle_count
         self.cells = cells
         self.maximum_range = maximum_range
         self.normalize = normalize
@@ -672,7 +670,7 @@ class LidarKinematicsObservation(ObservationType):
         self.reset_observations()
 
     def space(self) -> spaces.Space:
-        return spaces.Box(shape=(self.cells, len(self.features)), low=np.inf, high=np.inf, dtype=np.float32)
+        return spaces.Box(shape=(self.cells + 1, len(self.features)), low=np.inf, high=np.inf, dtype=np.float32)
 
     def reset_observations(self):
         self.observed = []
@@ -689,8 +687,7 @@ class LidarKinematicsObservation(ObservationType):
         self.reset_observations()
         close_obstacles = self.close_obstacles_to(self.observer_vehicle,
                                                   distance=self.maximum_range,
-                                                  count=self.vehicles_count-1,
-                                                  see_behind=self.see_behind)
+                                                  count=None)
         if close_obstacles:
             origin = self.observer_vehicle.position
 
@@ -718,17 +715,17 @@ class LidarKinematicsObservation(ObservationType):
         if self.normalize:
             df = self.normalize_obs(df)
         # Fill missing rows
-        if df.shape[0] < self.vehicles_count:
-            rows = np.zeros((self.vehicles_count - df.shape[0], len(self.features)))
+        if df.shape[0] < self.cells + 1:
+            rows = np.zeros((self.cells + 1 - df.shape[0], len(self.features)))
             df = pd.concat([df, pd.DataFrame(data=rows, columns=self.features)], ignore_index=True)
         # Reorder
-        df = df[self.features]
+        #df = df[self.features]
         obs = df.values.copy()
         # Flatten
         return np.nan_to_num(obs).astype(self.space().dtype)
 
     def close_obstacles_to(self, observer_vehicle, distance: Optional[float] = None, count: Optional[int] = None,
-                           see_behind: bool = True, sort: bool = True) -> object:
+                           sort: bool = True) -> object:
         distance = distance or self.env.PERCEPTION_DISTANCE
         vehicles = [v for v in self.env.road.vehicles + self.env.road.objects
                      if np.linalg.norm(v.position - observer_vehicle.position) < distance
