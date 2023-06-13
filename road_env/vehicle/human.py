@@ -23,26 +23,25 @@ class Pedestrian(Vehicle):
         self.env = env
         self.config = config
         self.action_type = action_factory(env, config["action"])
+        self.action_type.controlled_vehicle = self
         self.action_space = self.action_type.space()
 
     def act(self, action: dict | str = None) -> None:
-        acceleration, steering = self.action_space.sample()
-
-        if any(abs(self.front_distance_to(other)) < self.LENGTH * self.WIDTH for other in self.others):
-            acceleration = 0
-
-        if self.lane_index[2] in (0, self.target_lane):
-            # Scale up the steering action
-            # thus increase chance of a u-turn
-            if 0.25 <= steering < 0.5:
-                steering += 0.5
-            elif -0.5 > steering >= 0.25:
-                steering -= 0.5
-
-        return super().act({
-            "acceleration": acceleration,
-            "steering": steering,
-        })
+        if action: # Called from ActionType.act()
+            super().act(action=action) # Forward action to vehicle (step later)
+        else: # Called from Road.act()
+            acceleration, steering = self.action_space.sample()
+            if any(abs(self.front_distance_to(other)) < self.LENGTH * self.WIDTH for other in self.others):
+                acceleration = 0
+            if self.lane_index[2] in (0, self.target_lane):
+                # Scale up the steering action
+                # thus increase chance of a u-turn
+                if 0.25 <= steering < 0.5:
+                    steering += 0.5
+                elif -0.5 < steering <= -0.25:
+                    print(steering)
+                    steering -= 0.5
+            self.action_type.act([acceleration, steering])
 
     def to_dict(self, origin_vehicle: Vehicle = None, observe_intentions: bool = True) -> dict:
         d = super().to_dict(origin_vehicle, observe_intentions)
