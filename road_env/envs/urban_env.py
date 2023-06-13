@@ -26,7 +26,8 @@ class UrbanRoadEnv(AbstractEnv):
         config.update({
             "observation": {
                 "type": "LidarKinematicsObservation",
-                "features": ["class", "x", "y", "vx", "vy", "heading"],
+                "features": ["presence", "x", "y", "vx", "vy"],
+                "normalize": False,
                 "cells": 16,
                 "maximum_range": 60,
                 "see_behind": False,
@@ -50,14 +51,19 @@ class UrbanRoadEnv(AbstractEnv):
             "obstacle_count": 80,
             "obstacle_size": 1.5,
             "pedestrians": {
-                "count": 20,
+                "count": 50,
                 "action": {
                     "type": "ContinuousAction",
                     "longitudinal": True,
                     "lateral": True,
-                    "acceleration_range": [-0.833, 0.5], # -3 km/h/s - 
-                    "steering_range": [-0.524, 0.524], # 30 degree in radian
+                    "acceleration_range": [-0.5, 0.5], # ~2 km/h/s 
+                    "steering_range": [-np.pi / 2, np.pi / 2], # 90 degree in radian
                     "speed_range": [0, 0.833] # 3 km/h
+                },
+                "crossing": {
+                    "min_distance": 5,
+                    "max_distance": 50,
+                    "probability": 0.5,
                 }
             },
             "duration": 999,  # [s]
@@ -95,7 +101,7 @@ class UrbanRoadEnv(AbstractEnv):
     def _make_vehicles(self) -> None:
         ego_vehicle = self.action_type.vehicle_class(
             self.road,
-            self.road.network.get_lane(("0", "1", self.config["initial_lane_id"])).position(200, 0),
+            self.road.network.get_lane(("0", "1", self.config["initial_lane_id"])).position(5, 0),
         )
         ego_vehicle.color = VehicleGraphics.EGO_COLOR
         self.road.vehicles.append(ego_vehicle)
@@ -118,22 +124,23 @@ class UrbanRoadEnv(AbstractEnv):
 
     def _make_pedestrians(self) -> None:
         for _ in range(self.config["pedestrians"]["count"]):
-            lane_index = self._generator.integers(0, self.config["lanes_count"]-1)
+            lane_index = self._generator.choice((0, self.config["lanes_count"] - 1))
             lane = self.road.network.get_lane(("0", "1", lane_index))
             pos_x = self._generator.integers(5, lane.end[0])
-            if lane_index <= self.config["lanes_count"] / 2:
-                heading = 1.05 + self._generator.random() * 1.05
-            else:
-                heading = -1.05 - self._generator.random() * 1.05
-            target_lane = self.config["lanes_count"]-1
+            pos_y = -lane.width if lane_index == 0 else lane.width
+            heading = self._generator.choice((0, np.pi))
             pedestrian = Pedestrian(
                 self.road,
-                position=lane.position(pos_x, 0),
-                speed=3,
-                heading=heading)
-            pedestrian.configure(self, self.config["pedestrians"])
-            pedestrian.target_lane = target_lane
-            pedestrian.others.append(self.vehicle)
+                position=lane.position(pos_x, pos_y),
+                heading=heading,
+                speed=0,
+                start_lane=lane_index,
+                max_lane=self.config["lanes_count"],
+                ego_vehicle=self.vehicle,
+                env=self,
+                action_config=self.config["pedestrians"]["action"],
+                crossing_config=self.config["pedestrians"]["crossing"]
+                )
             self.road.pedestrians.append(pedestrian)
             self.road.vehicles.append(pedestrian)
         self.pedestrians = self.road.pedestrians
