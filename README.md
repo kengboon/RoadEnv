@@ -1,7 +1,7 @@
 # RoadEnv
 An environment for urban area *autonomous driving* and decision-making - extended from [highway-env](https://github.com/Farama-Foundation/HighwayEnv) ([Permissive License](https://github.com/Farama-Foundation/HighwayEnv/blob/master/LICENSE)).
 
-<p align="center"><img src="https://github.com/kengboon/RoadEnv/assets/5046671/ebc2f414-c984-44da-bfa9-440321c8b2a3"/></p>
+<p align="center"><img src="https://github.com/kengboon/RoadEnv/assets/5046671/8a9c1c2b-3f62-4266-ab9c-cd0054267f45"/></p>
 
 ## Get Started
 1. Install [highway-env](https://github.com/Farama-Foundation/HighwayEnv) via pip for all dependencies.
