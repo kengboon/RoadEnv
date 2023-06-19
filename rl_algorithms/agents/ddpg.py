@@ -7,6 +7,8 @@ import torch.nn.functional as F
 import torch.optim as optim
 from ..networks import *
 
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
 class DDPGAgent:
     def __init__(
             self,
@@ -23,15 +25,15 @@ class DDPGAgent:
             recurrent=False
         ):
         if recurrent:
-            self.actor = RecurrentActor(state_dim, action_dim, max_action)
-            self.actor_target = RecurrentActor(state_dim, action_dim, max_action)
-            self.critic = RecurrentCritic(state_dim, action_dim)
-            self.critic_target = RecurrentCritic(state_dim, action_dim)
+            self.actor = RecurrentActor(state_dim, action_dim, max_action).to(device)
+            self.actor_target = RecurrentActor(state_dim, action_dim, max_action).to(device)
+            self.critic = RecurrentCritic(state_dim, action_dim).to(device)
+            self.critic_target = RecurrentCritic(state_dim, action_dim).to(device)
         else:
-            self.actor = Actor(state_dim, action_dim, max_action)
-            self.actor_target = Actor(state_dim, action_dim, max_action)
-            self.critic = Critic(state_dim, action_dim)
-            self.critic_target = Critic(state_dim, action_dim)
+            self.actor = Actor(state_dim, action_dim, max_action).to(device)
+            self.actor_target = Actor(state_dim, action_dim, max_action).to(device)
+            self.critic = Critic(state_dim, action_dim).to(device)
+            self.critic_target = Critic(state_dim, action_dim).to(device)
         self.actor_target.load_state_dict(self.actor.state_dict())
         self.critic_target.load_state_dict(self.critic.state_dict())
         self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=lr_actor)
@@ -53,14 +55,14 @@ class DDPGAgent:
         return state.flatten()
 
     def get_action(self, state):
-        state = Variable(torch.from_numpy(self.flatten_state(state)).float())
+        state = Variable(torch.from_numpy(self.flatten_state(state)).float()).to(device)
         with torch.no_grad():
             if self.recurrent:
                 action, self.hidden_state = self.actor(state.unsqueeze(0), self.hidden_state)
                 action = action[0]
             else:
                 action = self.actor(state)
-        action = action.detach().numpy()
+        action = action.cpu().detach().numpy()
         return action
     
     def update(self):
@@ -70,11 +72,11 @@ class DDPGAgent:
         batch = random.sample(self.replay_buffer, self.batch_size)
         state_batch, action_batch, reward_batch, next_state_batch, done_batch = zip(*batch)
 
-        state_batch = Variable(torch.from_numpy(np.array(state_batch)).float())
-        action_batch = Variable(torch.from_numpy(np.array(action_batch)).float())
-        reward_batch = Variable(torch.from_numpy(np.array(reward_batch)).float())
-        next_state_batch = Variable(torch.from_numpy(np.array(next_state_batch)).float())
-        done_batch = Variable(torch.from_numpy(np.array(done_batch)).float())
+        state_batch = Variable(torch.from_numpy(np.array(state_batch)).float()).to(device)
+        action_batch = Variable(torch.from_numpy(np.array(action_batch)).float()).to(device)
+        reward_batch = Variable(torch.from_numpy(np.array(reward_batch)).float()).to(device)
+        next_state_batch = Variable(torch.from_numpy(np.array(next_state_batch)).float()).to(device)
+        done_batch = Variable(torch.from_numpy(np.array(done_batch)).float()).to(device)
 
         # Update critic
         if self.recurrent:
