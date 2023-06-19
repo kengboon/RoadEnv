@@ -27,6 +27,10 @@ max_action = env.action_space.high[0]
 print("State dim:", state_dim, "Action dim:", action_dim, "Max action:", max_action)
 
 # %% Create DRL agent
+from datetime import datetime
+train_id = datetime.now().strftime("%y%m%d%H%M%S")
+model_dir = "models/ddpg-" + train_id
+
 from rl_algorithms import DDPGAgent
 agent = DDPGAgent(
     state_dim=state_dim,
@@ -35,15 +39,16 @@ agent = DDPGAgent(
     hidden_size=128)
 
 # %% Training
+training_logs = []
+
 obs, info = env.reset()
 done = truncated = False
-total_reward = 0
 
 import numpy as np
 max_epsilon = 1.
 min_epsilon = 0.05
 decay_rate = 0.0005
-num_episode = 20
+num_episode = 50000
 for episode in range(num_episode):
     print('Episode', episode+1)
     num_steps = 0
@@ -55,7 +60,6 @@ for episode in range(num_episode):
             action = env.action_space.sample()
         else:
             action = agent.get_action(obs)
-        epsilon -= 0.01
         next_obs, reward, done, truncated, info = env.step(action)
 
         # Update agent
@@ -71,6 +75,25 @@ for episode in range(num_episode):
             obs, info = env.reset()
             break
 
-    print('Total steps:', num_steps, ', Total reward:', episode_reward)
+    episode_log = {
+        "Episode": episode+1,
+        "Time steps": num_steps,
+        "Episode Rewards": episode_reward,
+        "Average Rewards": episode_reward / num_steps,
+        "Epsilon": epsilon,
+    }
+    episode_log.update(agent.get_log())
+    print(episode_log)
+    training_logs.append(episode_log)
+agent.save(model_dir)
+
+import csv, os
+os.makedirs("logs", exist_ok=True)
+train_log_path = "logs/ddpg-" + train_id + ".csv"
+with open(train_log_path, "w", newline="") as file:
+    writer = csv.DictWriter(file, fieldnames=episode_log.keys())
+    writer.writeheader()
+    writer.writerows(training_logs)
+print("Log:", train_log_path)
 
 env.close()
