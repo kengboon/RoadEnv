@@ -56,7 +56,8 @@ class DDPGAgent:
         state = Variable(torch.from_numpy(self.flatten_state(state)).float())
         with torch.no_grad():
             if self.recurrent:
-                action, self.hidden_state = self.actor(state, self.hidden_state)
+                action, self.hidden_state = self.actor(state.unsqueeze(0), self.hidden_state)
+                action = action[0]
             else:
                 action = self.actor(state)
         action = action.detach().numpy()
