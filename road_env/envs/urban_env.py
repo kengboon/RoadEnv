@@ -44,6 +44,7 @@ class UrbanRoadEnv(AbstractEnv):
                 "speed_range": [0, 22.222] # 80 km/h
             },
             "random_seed": 42,
+            "obstacle_preset": None,
             "lanes_count": 4,
             "road_length": 1000,
             "speed_limit": 16.667, # 60 km/h
@@ -63,15 +64,15 @@ class UrbanRoadEnv(AbstractEnv):
                 "crossing": {
                     "min_distance": 5,
                     "max_distance": 50,
-                    "probability": 0.5,
+                    "probability": 0.333,
                 }
             },
-            "duration": 999,  # [s]
+            "duration": 99,  # Time step
             "collision_reward": -1,
-            "on_lane_reward": 0.2,
-            "on_road_reward": 0.1,
+            "on_lane_reward": 0.1,
+            "on_road_reward": 0,
             "speed_reward": 0.3,
-            "reward_speed_range": [13.889, 16.667, 19.167], # 50-60-69 km/h
+            "reward_speed_range": [0, 16.667, 19.167], # 0-60-69 km/h
             "normalize_reward": True,
             "offroad_terminal": True,
             "show_trajectories": False
@@ -81,10 +82,35 @@ class UrbanRoadEnv(AbstractEnv):
     def _reset(self) -> None:
         seed_seq = np.random.SeedSequence(self.config["random_seed"])
         self._generator = np.random.Generator(np.random.PCG64(seed_seq))
+        self._preset_mode()
         self._make_road()
         self._make_vehicles()
         self._make_obstacles()
         self._make_pedestrians()
+
+    def _preset_mode(self) -> None:
+        match self.config["obstacle_preset"]:
+            case 1: # Low occlusion
+                self.configure({
+                    "obstacle_count": 20,
+                    "obstacle_size": 0.75
+                })
+            case 2: # Medium occlusion
+                self.configure({
+                    "obstacle_count": 50,
+                    "obstacle_size": 1.5
+                })
+            case 3: # High occlusion
+                self.configure({
+                    "obstacle_count": 100,
+                    "obstacle_size": 1.75
+                })
+            case 4: # Random level
+                self.configure({
+                    "obstacle_count": self._generator.integers(20, 100),
+                    "obstacle_size": self._generator.random() + 0.75
+                })
+
 
     def _make_road(self) -> None:
         road_network = RoadNetwork.straight_road_network(
@@ -175,8 +201,11 @@ class UrbanRoadEnv(AbstractEnv):
             low_speed, desired_speed, high_speed = self.config["reward_speed_range"]
             # Use forward speed, see https://github.com/Farama-Foundation/HighwayEnv/issues/268
             forward_speed = self.vehicle.speed * np.cos(self.vehicle.heading)
+            if low_speed <= forward_speed <= desired_speed:
+                speed_tolerance = desired_speed - low_speed
+            elif desired_speed <= forward_speed <= high_speed:
+                speed_tolerance = high_speed - desired_speed
             if low_speed <= forward_speed <= high_speed:
-                speed_tolerance = max(abs(desired_speed - low_speed), abs(desired_speed - high_speed))
                 speed_diff = abs(forward_speed - desired_speed)
                 rewards["speed_reward"] = speed_diff / speed_tolerance
         return rewards
@@ -187,3 +216,11 @@ class UrbanRoadEnv(AbstractEnv):
     
     def _is_truncated(self) -> bool:
         return self.time >= self.config['duration']
+    
+    def get_performance(self):
+        # Count pedestrian crossed the road
+        pedestrian_crossed = sum(map(lambda x: x.crossed, self.road.pedestrians))
+        return {
+            "count": pedestrian_crossed,
+            "percentage": pedestrian_crossed / self.config["pedestrians"]["count"] * 100.
+        }
