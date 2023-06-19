@@ -1,5 +1,5 @@
 from collections import deque
-import random
+import random, os
 import numpy as np
 import torch
 from torch.autograd import Variable
@@ -18,7 +18,7 @@ class DDPGAgent:
             lr_critic=0.001,
             gamma=.99,
             tau=0.001,
-            buffer_size=10000,
+            buffer_size=100000,
             batch_size=1,
             recurrent=False
         ):
@@ -32,6 +32,8 @@ class DDPGAgent:
             self.actor_target = Actor(state_dim, action_dim, max_action)
             self.critic = Critic(state_dim, action_dim)
             self.critic_target = Critic(state_dim, action_dim)
+        self.actor_target.load_state_dict(self.actor.state_dict())
+        self.critic_target.load_state_dict(self.critic.state_dict())
         self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=lr_actor)
         self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=lr_critic)
         self.buffer_size = buffer_size
@@ -44,6 +46,8 @@ class DDPGAgent:
             hx = torch.zeros(self.batch_size, hidden_size)
             cx = torch.zeros(self.batch_size, hidden_size)
             self.hidden_state = (hx, cx)
+        self.actor_losses = []
+        self.critic_losses = []
 
     def flatten_state(self, state):
         return state.flatten()
@@ -84,6 +88,7 @@ class DDPGAgent:
                 next_Q_values = self.critic_target(next_state_batch, next_actions)
         target_Q_values = reward_batch + (1 - done_batch) * self.gamma * next_Q_values
         critic_loss = F.mse_loss(Q_values, target_Q_values)
+        self.critic_losses.append(critic_loss)
 
         self.critic_optimizer.zero_grad()
         critic_loss.backward()
@@ -96,6 +101,7 @@ class DDPGAgent:
         else:
             actions = self.actor(state_batch)
             actor_loss = -self.critic(state_batch, actions).mean()
+        self.actor_losses.append(actor_loss)
 
         self.actor_optimizer.zero_grad()
         actor_loss.backward()
@@ -110,3 +116,24 @@ class DDPGAgent:
 
     def add_to_replay_buffer(self, state, action, reward, next_state, done):
         self.replay_buffer.append((self.flatten_state(state), action, reward, self.flatten_state(next_state), done))
+
+    def get_log(self):
+        avg_actor_loss = sum(self.actor_losses) / len(self.actor_losses)
+        avg_critic_loss = sum(self.critic_losses) / len(self.critic_losses)
+        self.actor_losses.clear()
+        self.critic_losses.clear()
+        return {
+            "Average Actor Loss": avg_actor_loss.item(),
+            "Average Critic Loss": avg_critic_loss.item()
+        }
+
+    def load(self, dir):
+        self.actor.load_state_dict(torch.load(os.path.join(dir, "actor.pth")))
+        self.actor_target.load_state_dict(self.actor.state_dict())
+        self.critic.load_state_dict(torch.load(os.path.join(dir, "critic.pth")))
+        self.critic_target.load_state_dict(self.critic.state_dict())
+
+    def save(self, dir):
+        os.makedirs(dir, exist_ok=True)
+        torch.save(self.actor.state_dict(), os.path.join(dir, "actor.pth"))
+        torch.save(self.critic.state_dict(), os.path.join(dir, "critic.pth"))
