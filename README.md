@@ -22,18 +22,6 @@ An environment for urban area *autonomous driving* and decision-making - extende
     ```BAT
     git clone https://github.com/kengboon/RoadEnv.git
     ```
-3. Sample code (see [scripts](https://github.com/kengboon/RoadEnv/tree/main/scripts)).
-    ```Python
-    # Register environment
-    from road_env import register_road_envs
-    register_road_envs()
-    
-    # Make environment
-    import gymnasium as gym
-    env = gym.make('urban-road-v0', render_mode='rgb_array')
-    env.reset()
-    ```
-
 ## Usage
 ```Python
 # Register environment
