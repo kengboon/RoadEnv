@@ -39,15 +39,23 @@ obs, info = env.reset()
 done = truncated = False
 total_reward = 0
 
+import numpy as np
+max_epsilon = 1.
+min_epsilon = 0.05
+decay_rate = 0.0005
 num_episode = 20
 for episode in range(num_episode):
     print('Episode', episode+1)
     num_steps = 0
     episode_reward = 0
+    epsilon = min_epsilon + (max_epsilon - min_epsilon) * np.exp(-decay_rate * episode)
 
     while True: # Use config["duration"] to truncate
-        action = agent.get_action(obs)
-        print(action)
+        if np.random.rand() < epsilon:
+            action = env.action_space.sample()
+        else:
+            action = agent.get_action(obs)
+        epsilon -= 0.01
         next_obs, reward, done, truncated, info = env.step(action)
 
         # Update agent
@@ -57,7 +65,7 @@ for episode in range(num_episode):
         obs = next_obs
         num_steps += 1
         episode_reward += reward
-        env.render() # Note: Do not render during training
+        #env.render() # Note: Do not render during training
 
         if done or truncated:
             obs, info = env.reset()
