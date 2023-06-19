@@ -12,9 +12,13 @@ register_road_envs()
 # %% Make environment
 import gymnasium as gym
 env = gym.make("urban-road-v0", render_mode="rgb_array")
-env.configure({
+env.configure({    
+    "screen_width": 1200,
+    "screen_height": 500,
+    "scaling": 7.5,
     "random_seed": None,
-    "duration": 60
+    "duration": 60,    
+    "obstacle_preset": 4
 })
 
 # %% Get dimensions
@@ -46,8 +50,8 @@ done = truncated = False
 
 import time
 import numpy as np
-max_epsilon = 0.3
-min_epsilon = 1.
+max_epsilon = 1.
+min_epsilon = .05
 decay_rate = 0.0005
 num_episode = 10000
 total_start_time = time.time()
@@ -72,7 +76,8 @@ for episode in range(num_episode):
         obs = next_obs
         num_steps += 1
         episode_reward += reward
-        #env.render() # Note: Do not render during training
+        if episode % 100 == 0:
+            env.render() # Note: Do not render during training
 
         if done or truncated:
             obs, info = env.reset()
