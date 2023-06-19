@@ -27,7 +27,7 @@ class UrbanRoadEnv(AbstractEnv):
             "observation": {
                 "type": "LidarKinematicsObservation",
                 "features": ["presence", "x", "y", "vx", "vy"],
-                "normalize": False,
+                "normalize": True,
                 "cells": 16,
                 "maximum_range": 60,
                 "see_behind": False,
