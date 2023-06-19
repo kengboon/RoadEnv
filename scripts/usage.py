@@ -31,8 +31,9 @@ env.configure({
     "screen_width": 1200,
     "screen_height": 500,
     "scaling": 7.5,
-    "random_seed": 10,
+    "random_seed": None,
     "duration": 60, # Maximum duration (s) per episode
+    "obstacle_preset": 4
 })
 env.reset()
 
@@ -55,6 +56,7 @@ for episode in range(num_episodes):
         episode_reward += reward
 
         if done or truncated:
+            print(env.get_performance())
             obs, info = env.reset()
             break
 
