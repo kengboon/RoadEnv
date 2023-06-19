@@ -44,13 +44,16 @@ training_logs = []
 obs, info = env.reset()
 done = truncated = False
 
+import time
 import numpy as np
-max_epsilon = 1.
-min_epsilon = 0.05
+max_epsilon = 0.3
+min_epsilon = 1.
 decay_rate = 0.0005
-num_episode = 50000
+num_episode = 10000
+total_start_time = time.time()
 for episode in range(num_episode):
     print('Episode', episode+1)
+    start_time = time.time()
     num_steps = 0
     episode_reward = 0
     epsilon = min_epsilon + (max_epsilon - min_epsilon) * np.exp(-decay_rate * episode)
@@ -75,6 +78,8 @@ for episode in range(num_episode):
             obs, info = env.reset()
             break
 
+    end_time = time.time()
+    print('Episode:', end_time - start_time, 'Total elapsed:', end_time - total_start_time)
     episode_log = {
         "Episode": episode+1,
         "Time steps": num_steps,
