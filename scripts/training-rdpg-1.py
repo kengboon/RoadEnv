@@ -14,7 +14,8 @@ import gymnasium as gym
 env = gym.make("urban-road-v0", render_mode="rgb_array")
 env.configure({
     "random_seed": None,
-    "duration": 60
+    "duration": 60,
+    "obstacle_preset": 4
 })
 
 # %% Get dimensions
@@ -40,18 +41,32 @@ agent = DDPGAgent(
     recurrent=True)
 
 # %% Training
+import csv, os
 training_logs = []
+def save_training_logs(writeheader=False, clear=True):
+    os.makedirs("logs/train", exist_ok=True)
+    train_log_path = "logs/train/rdpg-" + train_id + ".csv"
+    with open(train_log_path, "a", newline="") as file:
+        writer = csv.DictWriter(file, fieldnames=episode_log.keys())
+        if writeheader:
+            writer.writeheader()
+        writer.writerows(training_logs)
+    training_logs.clear()
 
 obs, info = env.reset()
 done = truncated = False
 
+import time
 import numpy as np
-max_epsilon = 1
-min_epsilon = 0.05
+max_epsilon = .06
+min_epsilon = .05
 decay_rate = 0.0005
-num_episode = 50000
+num_episode = 10000
+save_interval = 100
+total_start_time = time.time()
 for episode in range(num_episode):
     print('Episode', episode+1)
+    start_time = time.time()
     num_steps = 0
     episode_reward = 0
     epsilon = min_epsilon + (max_epsilon - min_epsilon) * np.exp(-decay_rate * episode)
@@ -61,6 +76,7 @@ for episode in range(num_episode):
             action = env.action_space.sample()
         else:
             action = agent.get_action(obs)
+        print(action)
         next_obs, reward, done, truncated, info = env.step(action)
 
         # Update agent
@@ -76,25 +92,24 @@ for episode in range(num_episode):
             obs, info = env.reset()
             break
 
+    end_time = time.time()
+
     episode_log = {
         "Episode": episode+1,
         "Time steps": num_steps,
         "Episode Rewards": episode_reward,
         "Average Rewards": episode_reward / num_steps,
         "Epsilon": epsilon,
+        "Elapsed": end_time - start_time,
+        "Total Elapsed": end_time - total_start_time
     }
-    episode_log.update(agent.get_log())
+    #episode_log.update(agent.get_log())
     print(episode_log)
-    training_logs.append(episode_log)
-agent.save(model_dir)
 
-import csv, os
-os.makedirs("logs", exist_ok=True)
-train_log_path = "logs/rdpg-" + train_id + ".csv"
-with open(train_log_path, "w", newline="") as file:
-    writer = csv.DictWriter(file, fieldnames=episode_log.keys())
-    writer.writeheader()
-    writer.writerows(training_logs)
-print("Log:", train_log_path)
+    training_logs.append(episode_log)
+    if episode % save_interval == 0 or episode == num_episode - 1:
+        agent.get_log()
+        agent.save(os.path.join(model_dir, str(episode)))
+        save_training_logs(episode==0)
 
 env.close()
