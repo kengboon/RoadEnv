@@ -130,10 +130,10 @@ class DDPGAgent:
             "Average Critic Loss": avg_critic_loss.item()
         }
 
-    def load(self, dir):
-        self.actor.load_state_dict(torch.load(os.path.join(dir, "actor.pth")))
+    def load(self, dir, device=None):
+        self.actor.load_state_dict(torch.load(os.path.join(dir, "actor.pth"), map_location=torch.device(device)))
         self.actor_target.load_state_dict(self.actor.state_dict())
-        self.critic.load_state_dict(torch.load(os.path.join(dir, "critic.pth")))
+        self.critic.load_state_dict(torch.load(os.path.join(dir, "critic.pth"), map_location=torch.device(device)))
         self.critic_target.load_state_dict(self.critic.state_dict())
 
     def save(self, dir):
