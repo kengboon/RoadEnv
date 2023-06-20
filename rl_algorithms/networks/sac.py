@@ -1,4 +1,5 @@
 import torch
+from torch.distributions import Normal
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -20,4 +21,8 @@ class SoftActor(nn.Module):
         mean = self.mean(x)
         log_std = self.log_std(x)
         std = torch.exp(log_std)
-        return mean * self.max_action, std
+        normal = Normal(mean, std)
+        x = normal.rsample()
+        action = torch.tanh(x) * self.max_action
+        log_prob = normal.log_prob(x)
+        return action, log_prob

@@ -1,9 +1,11 @@
-from collections import deque
-import random
+import os
+import numpy as np
 import torch
-from torch.distributions import Normal
+from torch.autograd import Variable
 import torch.nn.functional as F
 import torch.optim as optim
+from ..networks import *
+from ..objects import ReplayBuffer
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -12,112 +14,130 @@ class SACAgent:
             self,
             state_dim,
             action_dim,
-            hidden_size,
             max_action,
-            actor,
-            critic_1,
-            critic_2,
-            critic_1_target,
-            critic_2_target,
+            hidden_size,
+            lr_actor=0.001,
+            lr_critic=0.001,
+            lr_valuenet=0.001,
             gamma=.99,
+            tau=0.001,
             buffer_size=100000,
             batch_size=1,
             alpha=0.1,
             recurrent=False
         ):
-        self.alpha = alpha
-        self.gamma = gamma
+        if recurrent:
+            pass
+        else:
+            self.actor = SoftActor(state_dim, action_dim, max_action).to(device)
+            self.critic1 = Critic(state_dim, action_dim).to(device)
+            self.critic2 = Critic(state_dim, action_dim).to(device)
+            self.value_net = Critic(state_dim, action_dim).to(device)
+        self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=lr_actor)
+        self.critic1_optimizer = optim.Adam(self.critic1.parameters(), lr=lr_critic)
+        self.critic2_optimizer = optim.Adam(self.critic2.parameters(), lr=lr_critic)
+        self.value_net_optimizer = optim.Adam(self.value_net.parameters(), lr=lr_valuenet)
         self.buffer_size = buffer_size
         self.batch_size = batch_size
-        self.replay_buffer = deque(maxlen=self.buffer_size)
-        self.actor = actor
-        self.optimizer_actor = optim.Adam(self.actor.parameters(), lr=0.00001)
-
-        self.critic1 = critic_1
-        self.optimizer_critic1 = optim.Adam(self.critic1.parameters(), lr=0.00001)
-        self.target_critic1 = critic_1_target
-
-        self.critic2 = critic_2
-        self.optimizer_critic2 = optim.Adam(self.critic2.parameters(), lr=0.00001)
-        self.target_critic2 = critic_2_target
-
-        self.target_entropy = -action_dim
-        self.log_alpha = torch.zeros(1, requires_grad=True, device=device)
-        self.alpha_optimizer = optim.Adam([self.log_alpha], lr=0.0003)
-
-        self.max_action = max_action
+        self.replay_buffer = ReplayBuffer(maxlen=self.buffer_size)
+        self.gamma = gamma
+        self.alpha = alpha
+        self.tau = tau
         self.recurrent = recurrent
         if self.recurrent:
             hx = torch.zeros(self.batch_size, hidden_size)
             cx = torch.zeros(self.batch_size, hidden_size)
             self.hidden_state = (hx, cx)
 
+    def flatten_state(self, state):
+        return state.flatten()
+
     def get_action(self, state):
-        state = torch.FloatTensor(state).unsqueeze(0)
+        state = Variable(torch.from_numpy(self.flatten_state(state)).float()).to(device)
         with torch.no_grad():
-            mean, std = self.actor(state)
-        dist = Normal(mean, std)
-        action = dist.sample()
-        action = action.detach().numpy()[0]
+            if self.recurrent:
+                action, self.hidden_state = self.actor(state.unsqueeze(0), self.hidden_state)
+                action = action[0]
+            else:
+                action, _ = self.actor(state)
+        action = action.cpu().detach().numpy()
         return action
 
-    def update(self, batch_size=256, discount=0.99, tau=0.005, alpha_lr=0.0003):
+    def update(self):
         if len(self.replay_buffer) < self.batch_size:
             return
 
-        batch = random.sample(self.replay_buffer, self.batch_size)
-        state, action, reward, next_state, done = zip(*batch)
+        state_batch, action_batch, reward_batch, next_state_batch, done_batch = self.replay_buffer.sample(self.batch_size)
 
-        state = torch.FloatTensor(state).to(device)
-        action = torch.FloatTensor(action).to(device)
-        next_state = torch.FloatTensor(next_state).to(device)
-        reward = torch.FloatTensor(reward).to(device)
-        done = torch.FloatTensor(done).to(device)
+        state_batch = Variable(torch.from_numpy(np.array(state_batch)).float()).to(device)
+        action_batch = Variable(torch.from_numpy(np.array(action_batch)).float()).to(device)
+        reward_batch = Variable(torch.from_numpy(np.array(reward_batch)).float()).to(device)
+        next_state_batch = Variable(torch.from_numpy(np.array(next_state_batch)).float()).to(device)
+        done_batch = Variable(torch.from_numpy(np.array(done_batch)).float()).to(device)
 
-        # Update critic networks
         with torch.no_grad():
-            next_action_mean, next_action_std = self.actor(next_state)
-            next_action_dist = Normal(next_action_mean, next_action_std)
-            next_action = next_action_dist.sample()
-            next_log_prob = next_action_dist.log_prob(next_action)
-            target_q1 = self.target_critic1(next_state, next_action)
-            target_q2 = self.target_critic2(next_state, next_action)
-            target_q = torch.min(target_q1, target_q2) - self.alpha * next_log_prob
-            target_q = reward + (1 - done) * self.gamma * target_q
+            next_action, next_action_log_prob = self.actor(next_state_batch)
+            q1_next = self.critic1(next_state_batch, next_action)
+            q2_next = self.critic2(next_state_batch, next_action)
+            min_q_next = torch.min(q1_next, q2_next) - self.alpha * next_action_log_prob
+            next_q_value = reward_batch + (1 - done_batch) * self.gamma * min_q_next
 
-        current_q1 = self.critic1(state, action)
-        current_q2 = self.critic2(state, action)
-        critic1_loss = F.mse_loss(current_q1, target_q)
-        critic2_loss = F.mse_loss(current_q2, target_q)
+        q1 = self.critic1(state_batch, action_batch)
+        q2 = self.critic2(state_batch, action_batch)
 
-        self.optimizer_critic1.zero_grad()
+        critic1_loss = F.mse_loss(q1, next_q_value)
+        critic2_loss = F.mse_loss(q2, next_q_value)
+
+        self.critic1_optimizer.zero_grad()
         critic1_loss.backward()
-        self.optimizer_critic1.step()
+        self.critic1_optimizer.step()
 
-        self.optimizer_critic2.zero_grad()
+        self.critic2_optimizer.zero_grad()
         critic2_loss.backward()
-        self.optimizer_critic2.step()
+        self.critic2_optimizer.step()
 
-        # Update actor network
-        action_mean, action_std = self.actor(state)
-        action_dist = Normal(action_mean, action_std)
-        log_prob = action_dist.log_prob(action)
-        q_value = torch.min(self.critic1(state, action), self.critic2(state, action))
-        actor_loss = (self.alpha * log_prob - q_value).mean()
+        new_action, log_prob = self.actor(state_batch)
+        q1_new = self.critic1(state_batch, new_action)
+        q2_new = self.critic2(state_batch, new_action)
+        min_q_new = torch.min(q1_new, q2_new)
 
-        self.optimizer_actor.zero_grad()
+        actor_loss = (self.alpha * log_prob - min_q_new).mean()
+
+        self.actor_optimizer.zero_grad()
         actor_loss.backward()
-        self.optimizer_actor.step()
+        self.actor_optimizer.step()
 
-        for param, target_param in zip(self.critic1.parameters(), self.target_critic1.parameters()):
-            target_param.data.copy_(tau * param.data + (1 - tau) * target_param.data)
+        value_net_loss = F.mse_loss(self.value_net(state_batch, action_batch), min_q_new.detach())
 
-        for param, target_param in zip(self.critic2.parameters(), self.target_critic2.parameters()):
-            target_param.data.copy_(tau * param.data + (1 - tau) * target_param.data)
+        self.value_net_optimizer.zero_grad()
+        value_net_loss.backward()
+        self.value_net_optimizer.step()
+
+        # Update target value network
+        for target_param, param1, param2 in zip(
+            self.value_net.parameters(), self.critic1.parameters(), self.critic2.parameters()
+        ):
+            target_param.data.copy_(self.tau * param1.data + (1 - self.tau) * param2.data)
 
     def _sample_next_action_log_prob(self, next_state):
         next_action, next_log_prob = self.actor.sample(next_state)
         return next_action, next_log_prob
 
     def add_to_replay_buffer(self, state, action, reward, next_state, done):
-        self.replay_buffer.append((state, action, reward, next_state, done))
+        self.replay_buffer.append((self.flatten_state(state), action, reward, self.flatten_state(next_state), done))
+
+    def get_log(self):
+        return {}
+
+    def load(self, dir, device=None):
+        self.actor.load_state_dict(torch.load(os.path.join(dir, "actor.pth"), map_location=torch.device(device)))
+        self.critic1.load_state_dict(torch.load(os.path.join(dir, "critic1.pth"), map_location=torch.device(device)))
+        self.critic2.load_state_dict(torch.load(os.path.join(dir, "critic2.pth"), map_location=torch.device(device)))
+        self.value_net.load_state_dict(torch.load(os.path.join(dir, "value_net.pth"), map_location=torch.device(device)))
+
+    def save(self, dir):
+        os.makedirs(dir, exist_ok=True)
+        torch.save(self.actor.state_dict(), os.path.join(dir, "actor.pth"))
+        torch.save(self.critic1.state_dict(), os.path.join(dir, "critic1.pth"))
+        torch.save(self.critic2.state_dict(), os.path.join(dir, "critic2.pth"))
+        torch.save(self.value_net.state_dict(), os.path.join(dir, "value_net.pth"))
