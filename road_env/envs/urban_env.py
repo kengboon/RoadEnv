@@ -215,7 +215,9 @@ class UrbanRoadEnv(AbstractEnv):
             self.config["offroad_terminal"] and not self.vehicle.on_road)
     
     def _is_truncated(self) -> bool:
-        return self.time >= self.config['duration']
+        if self.config['duration']:
+            return self.time >= self.config['duration']
+        return False
     
     def get_performance(self):
         # Count pedestrian crossed the road
