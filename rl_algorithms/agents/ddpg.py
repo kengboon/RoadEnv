@@ -1,11 +1,11 @@
-from collections import deque
-import random, os
+import os
 import numpy as np
 import torch
 from torch.autograd import Variable
 import torch.nn.functional as F
 import torch.optim as optim
 from ..networks import *
+from ..objects import ReplayBuffer
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -40,7 +40,7 @@ class DDPGAgent:
         self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=lr_critic)
         self.buffer_size = buffer_size
         self.batch_size = batch_size
-        self.replay_buffer = deque(maxlen=self.buffer_size)
+        self.replay_buffer = ReplayBuffer(maxlen=self.buffer_size)
         self.gamma = gamma
         self.tau = tau
         self.recurrent = recurrent
@@ -69,8 +69,7 @@ class DDPGAgent:
         if len(self.replay_buffer) < self.batch_size:
             return
 
-        batch = random.sample(self.replay_buffer, self.batch_size)
-        state_batch, action_batch, reward_batch, next_state_batch, done_batch = zip(*batch)
+        state_batch, action_batch, reward_batch, next_state_batch, done_batch = self.replay_buffer.sample(self.batch_size)
 
         state_batch = Variable(torch.from_numpy(np.array(state_batch)).float()).to(device)
         action_batch = Variable(torch.from_numpy(np.array(action_batch)).float()).to(device)
