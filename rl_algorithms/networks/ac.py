@@ -27,7 +27,10 @@ class Critic(nn.Module):
         self.fc3 = nn.Linear(hidden2, 1)
 
     def forward(self, state, action):
-        x = torch.cat([state, action], dim=1)
+        if action is not None:
+            x = torch.cat([state, action], dim=1)
+        else:
+            x = state
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         x = self.fc3(x)

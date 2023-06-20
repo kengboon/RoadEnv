@@ -16,13 +16,18 @@ class SoftActor(nn.Module):
         self.log_std = nn.Linear(hidden2, action_dim)
 
     def forward(self, state):
+        # Forward pass
         x = F.relu(self.fc1(state))
         x = F.relu(self.fc2(x))
         mean = self.mean(x)
         log_std = self.log_std(x)
-        std = torch.exp(log_std)
+        log_std = torch.clamp(log_std, -1, 1)
+
+        # Get action
+        std = log_std.exp()
         normal = Normal(mean, std)
-        x = normal.rsample()
-        action = torch.tanh(x) * self.max_action
-        log_prob = normal.log_prob(x)
-        return action, log_prob
+        z = normal.sample()
+        action = torch.tanh(z) * self.max_action
+        log_prob = normal.log_prob(z) - torch.log(1 - action.pow(2))
+        log_prob = log_prob.sum(-1, keepdim=True)
+        return action, log_prob, z, mean, log_std

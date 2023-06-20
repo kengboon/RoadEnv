@@ -30,12 +30,13 @@ class SACAgent:
             pass
         else:
             self.actor = SoftActor(state_dim, action_dim, max_action).to(device)
-            self.critic1 = Critic(state_dim, action_dim).to(device)
-            self.critic2 = Critic(state_dim, action_dim).to(device)
-            self.value_net = Critic(state_dim, action_dim).to(device)
+            self.critic = Critic(state_dim, action_dim).to(device)
+            self.value_net = Critic(state_dim, 0).to(device)
+
+            self.target_value_net = Critic(state_dim, 0).to(device)
+            self.target_value_net.load_state_dict(self.value_net.state_dict())            
         self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=lr_actor)
-        self.critic1_optimizer = optim.Adam(self.critic1.parameters(), lr=lr_critic)
-        self.critic2_optimizer = optim.Adam(self.critic2.parameters(), lr=lr_critic)
+        self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=lr_critic)
         self.value_net_optimizer = optim.Adam(self.value_net.parameters(), lr=lr_valuenet)
         self.buffer_size = buffer_size
         self.batch_size = batch_size
@@ -59,7 +60,7 @@ class SACAgent:
                 action, self.hidden_state = self.actor(state.unsqueeze(0), self.hidden_state)
                 action = action[0]
             else:
-                action, _ = self.actor(state)
+                action = self.actor(state)[0]
         action = action.cpu().detach().numpy()
         return action
 
@@ -75,49 +76,43 @@ class SACAgent:
         next_state_batch = Variable(torch.from_numpy(np.array(next_state_batch)).float()).to(device)
         done_batch = Variable(torch.from_numpy(np.array(done_batch)).float()).to(device)
 
-        with torch.no_grad():
-            next_action, next_action_log_prob = self.actor(next_state_batch)
-            q1_next = self.critic1(next_state_batch, next_action)
-            q2_next = self.critic2(next_state_batch, next_action)
-            min_q_next = torch.min(q1_next, q2_next) - self.alpha * next_action_log_prob
-            next_q_value = reward_batch + (1 - done_batch) * self.gamma * min_q_next
+        expected_q_value = self.critic(state_batch, action_batch)
+        expected_value = self.value_net(state_batch, None)
+        new_action, log_prob, z, mean, log_std = self.actor(state_batch)
+        target_value = self.target_value_net(next_state_batch, None)
+        next_q_value = reward_batch + (1 - done_batch) * self.gamma * target_value
+        q_value_loss = F.mse_loss(expected_q_value, next_q_value.detach())
 
-        q1 = self.critic1(state_batch, action_batch)
-        q2 = self.critic2(state_batch, action_batch)
+        expected_new_q_value = self.critic(state_batch, new_action)
+        next_value = expected_new_q_value - log_prob
+        value_loss = F.mse_loss(expected_value, next_value.detach())
 
-        critic1_loss = F.mse_loss(q1, next_q_value)
-        critic2_loss = F.mse_loss(q2, next_q_value)
+        log_prob_target = expected_new_q_value - expected_value
+        policy_loss = (log_prob * (log_prob - log_prob_target).detach()).mean()
 
-        self.critic1_optimizer.zero_grad()
-        critic1_loss.backward()
-        self.critic1_optimizer.step()
+        mean_loss = 1e-3 * mean.pow(2).mean()
+        std_loss = 1e-3 * log_std.pow(2).mean()
+        z_loss = 1e-3 * z.pow(2).sum(1).mean()
 
-        self.critic2_optimizer.zero_grad()
-        critic2_loss.backward()
-        self.critic2_optimizer.step()
+        policy_loss += mean_loss + std_loss + z_loss
 
-        new_action, log_prob = self.actor(state_batch)
-        q1_new = self.critic1(state_batch, new_action)
-        q2_new = self.critic2(state_batch, new_action)
-        min_q_new = torch.min(q1_new, q2_new)
-
-        actor_loss = (self.alpha * log_prob - min_q_new).mean()
-
-        self.actor_optimizer.zero_grad()
-        actor_loss.backward()
-        self.actor_optimizer.step()
-
-        value_net_loss = F.mse_loss(self.value_net(state_batch, action_batch), min_q_new.detach())
+        self.critic_optimizer.zero_grad()
+        q_value_loss.backward()
+        self.critic_optimizer.step()
 
         self.value_net_optimizer.zero_grad()
-        value_net_loss.backward()
+        value_loss.backward()
         self.value_net_optimizer.step()
 
-        # Update target value network
-        for target_param, param1, param2 in zip(
-            self.value_net.parameters(), self.critic1.parameters(), self.critic2.parameters()
-        ):
-            target_param.data.copy_(self.tau * param1.data + (1 - self.tau) * param2.data)
+        self.actor_optimizer.zero_grad()
+        policy_loss.backward()
+        self.actor_optimizer.step()
+
+
+        for target_param, param in zip(self.target_value_net.parameters(), self.value_net.parameters()):
+            target_param.data.copy_(
+                target_param.data * (1.0 - self.tau) + param.data * self.tau
+            )
 
     def _sample_next_action_log_prob(self, next_state):
         next_action, next_log_prob = self.actor.sample(next_state)
@@ -131,13 +126,12 @@ class SACAgent:
 
     def load(self, dir, device=None):
         self.actor.load_state_dict(torch.load(os.path.join(dir, "actor.pth"), map_location=torch.device(device)))
-        self.critic1.load_state_dict(torch.load(os.path.join(dir, "critic1.pth"), map_location=torch.device(device)))
-        self.critic2.load_state_dict(torch.load(os.path.join(dir, "critic2.pth"), map_location=torch.device(device)))
+        self.critic.load_state_dict(torch.load(os.path.join(dir, "critic.pth"), map_location=torch.device(device)))
         self.value_net.load_state_dict(torch.load(os.path.join(dir, "value_net.pth"), map_location=torch.device(device)))
+        self.target_value_net.load_state_dict(self.value_net.state_dict())
 
     def save(self, dir):
         os.makedirs(dir, exist_ok=True)
         torch.save(self.actor.state_dict(), os.path.join(dir, "actor.pth"))
-        torch.save(self.critic1.state_dict(), os.path.join(dir, "critic1.pth"))
-        torch.save(self.critic2.state_dict(), os.path.join(dir, "critic2.pth"))
+        torch.save(self.critic.state_dict(), os.path.join(dir, "critic.pth"))
         torch.save(self.value_net.state_dict(), os.path.join(dir, "value_net.pth"))
