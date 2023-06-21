@@ -124,14 +124,39 @@ class SACAgent:
     def get_log(self):
         return {}
 
-    def load(self, dir, device=None):
+    def eval(self):
+        self.train(False)
+
+    def train(self, mode: bool = True):
+        self.actor.train(mode=mode)
+
+    def load(self, dir, device=None, train=False):
         self.actor.load_state_dict(torch.load(os.path.join(dir, "actor.pth"), map_location=torch.device(device)))
-        self.critic.load_state_dict(torch.load(os.path.join(dir, "critic.pth"), map_location=torch.device(device)))
-        self.value_net.load_state_dict(torch.load(os.path.join(dir, "value_net.pth"), map_location=torch.device(device)))
-        self.target_value_net.load_state_dict(self.value_net.state_dict())
+        if not train:
+            self.eval()
+        else:
+            self.critic.load_state_dict(torch.load(os.path.join(dir, "critic.pth"), map_location=torch.device(device)))
+            self.value_net.load_state_dict(torch.load(os.path.join(dir, "value_net.pth"), map_location=torch.device(device)))
+            self.target_value_net.load_state_dict(self.value_net.state_dict())
+
+    def load_model(self, dir, device=None, train=False):
+        # Only load actor
+        self.actor = torch.load(os.path.join(dir, "actor.pth"), map_location=torch.device(device))
+        if not train:
+            self.eval()
+        else:
+            self.critic = torch.load(os.path.join(dir, "critic.pth"), map_location=torch.device(device))
+            self.value_net = torch.load(os.path.join(dir, "value_net.pth"), map_location=torch.device(device))
+            self.target_value_net.load_state_dict(self.value_net.state_dict())
 
     def save(self, dir):
         os.makedirs(dir, exist_ok=True)
         torch.save(self.actor.state_dict(), os.path.join(dir, "actor.pth"))
         torch.save(self.critic.state_dict(), os.path.join(dir, "critic.pth"))
         torch.save(self.value_net.state_dict(), os.path.join(dir, "value_net.pth"))
+
+    def save_model(self, dir):
+        os.makedirs(dir, exist_ok=True)
+        torch.save(self.actor, os.path.join(dir, "actor.pth"))
+        torch.save(self.critic, os.path.join(dir, "critic.pth"))
+        torch.save(self.value_net, os.path.join(dir, "value_net.pth"))
