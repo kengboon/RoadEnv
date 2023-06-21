@@ -26,7 +26,7 @@ class UrbanRoadEnv(AbstractEnv):
         config.update({
             "observation": {
                 "type": "LidarKinematicsObservation",
-                "features": ["presence", "x", "y", "vx", "vy"],
+                "features": ["presence", "class", "x", "y", "vx", "vy"],
                 "normalize": True,
                 "cells": 16,
                 "maximum_range": 60,
@@ -69,10 +69,12 @@ class UrbanRoadEnv(AbstractEnv):
             },
             "duration": 99,  # Time step
             "collision_reward": -1,
+            "low_speed_reward": -0.2,
+            "low_speed_range": [-1, 2.778], # 0-10 km/h
             "on_lane_reward": 0.1,
             "on_road_reward": 0,
-            "speed_reward": 0.3,
-            "reward_speed_range": [0, 16.667, 19.167], # 0-60-69 km/h
+            "high_speed_reward": 0.5,
+            "high_speed_range": [2.778, 16.667, 19.167], # 10-60-69 km/h
             "normalize_reward": True,
             "offroad_terminal": True,
             "show_trajectories": False
@@ -175,10 +177,16 @@ class UrbanRoadEnv(AbstractEnv):
         rewards = self._rewards(action)
         reward = sum(self.config.get(name, 0) * reward for name, reward in rewards.items())
         if self.config["normalize_reward"]:
-            reward = utils.lmap(reward,
-                                [self.config["collision_reward"],
-                                 self.config["on_road_reward"] + self.config["on_lane_reward"] + self.config["speed_reward"]],
-                                 [0, 1])
+            low = sum((
+                self.config["collision_reward"],
+                self.config["low_speed_reward"],
+            ))
+            high = sum((
+                self.config["on_road_reward"],
+                self.config["on_lane_reward"],
+                self.config["high_speed_reward"],
+            ))
+            reward = utils.lmap(reward, [low, high], [0, 1])
         return reward
 
     def _rewards(self, action: Action) -> Dict[Text, float]:
@@ -186,7 +194,8 @@ class UrbanRoadEnv(AbstractEnv):
             "collision_reward": self.vehicle.crashed,
             "on_road_reward": self.vehicle.on_road,
             "on_lane_reward": 0,
-            "speed_reward": 0
+            "high_speed_reward": 0,
+            "low_speed_reward": 0,
         }
         # On-lane reward if no collision
         if not self.vehicle.crashed:
@@ -198,16 +207,21 @@ class UrbanRoadEnv(AbstractEnv):
 
         # Speed reward if no collision
         if not self.vehicle.crashed:
-            low_speed, desired_speed, high_speed = self.config["reward_speed_range"]
             # Use forward speed, see https://github.com/Farama-Foundation/HighwayEnv/issues/268
-            forward_speed = self.vehicle.speed * np.cos(self.vehicle.heading)
+            forward_speed = self.vehicle.velocity[0] #self.vehicle.speed * np.cos(self.vehicle.heading)
+            # Low speed reward
+            low_speed = self.config["low_speed_range"]
+            if low_speed[0] <= forward_speed <= low_speed[1]:
+                rewards["low_speed_reward"] = 1
+            # High speed reward
+            low_speed, desired_speed, high_speed = self.config["high_speed_range"]
             if low_speed <= forward_speed <= desired_speed:
                 speed_tolerance = desired_speed - low_speed
             elif desired_speed <= forward_speed <= high_speed:
                 speed_tolerance = high_speed - desired_speed
             if low_speed <= forward_speed <= high_speed:
                 speed_diff = abs(forward_speed - desired_speed)
-                rewards["speed_reward"] = speed_diff / speed_tolerance
+                rewards["high_speed_reward"] = speed_diff / speed_tolerance
         return rewards
 
     def _is_terminated(self) -> bool:
