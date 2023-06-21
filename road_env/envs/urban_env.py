@@ -221,8 +221,10 @@ class UrbanRoadEnv(AbstractEnv):
     
     def get_performance(self):
         # Count pedestrian crossed the road
-        pedestrian_crossed = sum(map(lambda x: x.crossed, self.road.pedestrians))
+        p_crossed = sum(map(lambda x: x.crossed, self.road.pedestrians))
+        p_percent = p_crossed / self.config["pedestrians"]["count"] * 100.\
+            if self.config["pedestrians"]["count"] > 0 else 0
         return {
-            "count": pedestrian_crossed,
-            "percentage": pedestrian_crossed / self.config["pedestrians"]["count"] * 100.
+            "count": p_crossed,
+            "percentage": p_percent
         }
