@@ -199,7 +199,7 @@ class Obstacle(RoadObject):
 
     def to_dict(self, origin_vehicle=None, observe_intentions=True):
         d = super().to_dict(origin_vehicle, observe_intentions)
-        d['class'] = .5
+        d['class'] = 0
         return d
 
 class Landmark(RoadObject):
