@@ -201,7 +201,8 @@ class Vehicle(RoadObject):
             return np.zeros((3,))
 
     def to_dict(self, origin_vehicle: "Vehicle" = None, observe_intentions: bool = True) -> dict:
-        d = {
+        d = super().to_dict(origin_vehicle, observe_intentions)
+        d.update({
             'presence': 1,
             'class': 0,
             'x': self.position[0],
@@ -216,7 +217,7 @@ class Vehicle(RoadObject):
             'long_off': self.lane_offset[0],
             'lat_off': self.lane_offset[1],
             'ang_off': self.lane_offset[2],
-        }
+        })
         if not observe_intentions:
             d["cos_d"] = d["sin_d"] = 0
         if origin_vehicle:
