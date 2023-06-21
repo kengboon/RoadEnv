@@ -22,13 +22,21 @@ class DDPGAgent:
             tau=0.001,
             buffer_size=100000,
             batch_size=1,
-            recurrent=False
+            recurrent=False,
         ):
         if recurrent:
-            self.actor = RecurrentActor(state_dim, action_dim, max_action).to(device)
-            self.actor_target = RecurrentActor(state_dim, action_dim, max_action).to(device)
-            self.critic = RecurrentCritic(state_dim, action_dim).to(device)
-            self.critic_target = RecurrentCritic(state_dim, action_dim).to(device)
+            self.actor = RecurrentActor(
+                state_dim, action_dim, max_action,
+                batch_size=batch_size, hidden_dim=hidden_size).to(device)
+            self.actor_target = RecurrentActor(
+                state_dim, action_dim, max_action,
+                batch_size=batch_size, hidden_dim=hidden_size).to(device)
+            self.critic = RecurrentCritic(
+                state_dim, action_dim,
+                batch_size=batch_size, hidden_dim=hidden_size).to(device)
+            self.critic_target = RecurrentCritic(
+                state_dim, action_dim,
+                batch_size=batch_size, hidden_dim=hidden_size).to(device)
         else:
             self.actor = Actor(state_dim, action_dim, max_action).to(device)
             self.actor_target = Actor(state_dim, action_dim, max_action).to(device)
@@ -40,14 +48,11 @@ class DDPGAgent:
         self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=lr_critic)
         self.buffer_size = buffer_size
         self.batch_size = batch_size
+        self.hidden_size = hidden_size
         self.replay_buffer = ReplayBuffer(maxlen=self.buffer_size)
         self.gamma = gamma
         self.tau = tau
         self.recurrent = recurrent
-        if self.recurrent:
-            hx = torch.zeros(self.batch_size, hidden_size)
-            cx = torch.zeros(self.batch_size, hidden_size)
-            self.hidden_state = (hx, cx)
         self.actor_losses = []
         self.critic_losses = []
 
@@ -58,7 +63,7 @@ class DDPGAgent:
         state = Variable(torch.from_numpy(self.flatten_state(state)).float()).to(device)
         with torch.no_grad():
             if self.recurrent:
-                action, self.hidden_state = self.actor(state.unsqueeze(0), self.hidden_state)
+                action, self.hidden_state = self.actor(state.unsqueeze(0), None)
                 action = action[0]
             else:
                 action = self.actor(state)
@@ -90,7 +95,7 @@ class DDPGAgent:
                 next_Q_values = self.critic_target(next_state_batch, next_actions)
         target_Q_values = reward_batch + (1 - done_batch) * self.gamma * next_Q_values
         critic_loss = F.mse_loss(Q_values, target_Q_values)
-        self.critic_losses.append(critic_loss)
+        #self.critic_losses.append(critic_loss)
 
         self.critic_optimizer.zero_grad()
         critic_loss.backward()
@@ -98,12 +103,12 @@ class DDPGAgent:
 
         # Update actor
         if self.recurrent:
-            actions, _ = self.actor(state_batch, self.hidden_state)
+            actions, self.hidden_state = self.actor(state_batch, None)
             actor_loss = -self.critic(state_batch, actions, self.hidden_state)[0].mean()
         else:
             actions = self.actor(state_batch)
             actor_loss = -self.critic(state_batch, actions).mean()
-        self.actor_losses.append(actor_loss)
+        #self.actor_losses.append(actor_loss)
 
         self.actor_optimizer.zero_grad()
         actor_loss.backward()
@@ -129,13 +134,38 @@ class DDPGAgent:
             "Average Critic Loss": avg_critic_loss.item()
         }
 
-    def load(self, dir, device=None):
+    def eval(self):
+        self.train(False)
+
+    def train(self, mode: bool=True):
+        self.actor.train(mode=mode)
+
+    def load(self, dir, device=None, train=False):
         self.actor.load_state_dict(torch.load(os.path.join(dir, "actor.pth"), map_location=torch.device(device)))
-        self.actor_target.load_state_dict(self.actor.state_dict())
-        self.critic.load_state_dict(torch.load(os.path.join(dir, "critic.pth"), map_location=torch.device(device)))
-        self.critic_target.load_state_dict(self.critic.state_dict())
+        if not train:
+            self.eval()
+        else:
+            self.actor_target.load_state_dict(self.actor.state_dict())
+            self.critic.load_state_dict(torch.load(os.path.join(dir, "critic.pth"), map_location=torch.device(device)))
+            self.critic_target.load_state_dict(self.critic.state_dict())
+
+    def load_model(self, dir, device=None, train=False):
+        self.actor = torch.load(os.path.join(dir, "actor.pth"), map_location=torch.device(device))
+        if not train:
+            if self.recurrent:
+                self.actor.reset_hidden()
+            self.eval()
+        else:
+            self.actor_target = torch.load(os.path.join(dir, "actor.pth"), map_location=torch.device(device))
+            self.critic = torch.load(os.path.join(dir, "critic.pth"), map_location=torch.device(device))
+            self.critic_target = torch.load(os.path.join(dir, "critic.pth"), map_location=torch.device(device))
 
     def save(self, dir):
         os.makedirs(dir, exist_ok=True)
         torch.save(self.actor.state_dict(), os.path.join(dir, "actor.pth"))
         torch.save(self.critic.state_dict(), os.path.join(dir, "critic.pth"))
+
+    def save_model(self, dir):
+        os.makedirs(dir, exist_ok=True)
+        torch.save(self.actor, os.path.join(dir, "actor.pth"))
+        torch.save(self.critic, os.path.join(dir, "critic.pth"))
