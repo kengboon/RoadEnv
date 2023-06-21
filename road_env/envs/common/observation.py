@@ -706,11 +706,10 @@ class LidarKinematicsObservation(ObservationType):
                     self.observed.append(obstacle)
                 else:
                     self.unobserved.append(obstacle)
-
+            # Note: absolute x, y, vx, vy
             df = pd.concat([df, pd.DataFrame.from_records(
-                [v.to_dict(self.observer_vehicle, observe_intentions=self.observe_intentions)
-                 for v in self.observed])[self.features]],
-                           ignore_index=True)
+                [v.to_dict() for v in self.observed])[self.features]],
+                ignore_index=True)
         # Normalize and clip
         if self.normalize:
             df = self.normalize_obs(df)
@@ -746,7 +745,8 @@ class LidarKinematicsObservation(ObservationType):
                 "y": [-AbstractLane.DEFAULT_WIDTH * len(side_lanes), AbstractLane.DEFAULT_WIDTH * len(side_lanes)],
                 "vx": [-2*Vehicle.MAX_SPEED, 2*Vehicle.MAX_SPEED],
                 "vy": [-2*Vehicle.MAX_SPEED, 2*Vehicle.MAX_SPEED],
-                "heading": [-3.142, 3.142]
+                "heading": [-3.142, 3.142],
+                "distance": [0, self.env.PERCEPTION_DISTANCE]
             }
         for feature, f_range in self.features_range.items():
             if feature in df:

@@ -114,7 +114,7 @@ class RoadObject(ABC):
     def to_dict(self, origin_vehicle=None, observe_intentions=True):
         d = {
             'presence': 1,
-            'class': 0,
+            'class': 0.5,
             'x': self.position[0],
             'y': self.position[1],
             'vx': 0.,
@@ -123,7 +123,9 @@ class RoadObject(ABC):
             'cos_h': np.cos(self.heading),
             'sin_h': np.sin(self.heading),
             'cos_d': 0.,
-            'sin_d': 0.
+            'sin_d': 0.,
+            'on_road': int(self.on_road),
+            'distance': 0
         }
         if not observe_intentions:
             d["cos_d"] = d["sin_d"] = 0

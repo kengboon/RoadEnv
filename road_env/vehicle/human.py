@@ -55,8 +55,7 @@ class Pedestrian(Vehicle):
             # Evaluate to start crossing the road
             if self.ego_vehicle and not self.crossing and not self.crossed:
                 # Check ego vehicle distance within range
-                distance = np.linalg.norm(self.position - self.ego_vehicle.position)
-                if self.config["min_distance"] <= distance <= self.config["max_distance"]:
+                if self.config["min_distance"] <= self.distance_to_ego <= self.config["max_distance"]:
                     # Probability of crossing road
                     self.crossing = self.road.np_random.random() < self.config["probability"]
                     self.crossed = False
@@ -86,8 +85,13 @@ class Pedestrian(Vehicle):
             steering = utils.lmap(steering, self.action_type.steering_range, [-1, 1])
         return steering
 
+    @property
+    def distance_to_ego(self):
+        if self.ego_vehicle:
+            return np.linalg.norm(self.position - self.ego_vehicle.position) - self.WIDTH / 2
 
     def to_dict(self, origin_vehicle: Vehicle = None, observe_intentions: bool = True) -> dict:
         d = super().to_dict(origin_vehicle, observe_intentions)
         d['class'] = 1
+        d['distance'] = self.distance_to_ego
         return d
