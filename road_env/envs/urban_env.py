@@ -26,7 +26,7 @@ class UrbanRoadEnv(AbstractEnv):
         config.update({
             "observation": {
                 "type": "LidarKinematicsObservation",
-                "features": ["presence", "class", "x", "y", "vx", "vy"],
+                "features": ["presence", "on_road", "class", "y", "vx", "heading", "distance"],
                 "normalize": True,
                 "cells": 16,
                 "maximum_range": 60,
@@ -69,12 +69,12 @@ class UrbanRoadEnv(AbstractEnv):
             },
             "duration": 99,  # Time step
             "collision_reward": -1,
-            "low_speed_reward": -0.2,
-            "low_speed_range": [-1, 2.778], # 0-10 km/h
+            "low_speed_reward": -0.5,
+            "low_speed_range": [0, 5.556], # 0-20 km/h
             "on_lane_reward": 0.1,
             "on_road_reward": 0,
             "high_speed_reward": 0.5,
-            "high_speed_range": [2.778, 16.667, 19.167], # 10-60-69 km/h
+            "high_speed_range": [5.556, 16.667, 19.167], # 20-60-69 km/h
             "normalize_reward": True,
             "offroad_terminal": True,
             "show_trajectories": False
@@ -180,11 +180,13 @@ class UrbanRoadEnv(AbstractEnv):
             low = sum((
                 self.config["collision_reward"],
                 self.config["low_speed_reward"],
+                -0.01, # Fix precision loss
             ))
             high = sum((
                 self.config["on_road_reward"],
                 self.config["on_lane_reward"],
                 self.config["high_speed_reward"],
+                0.01, # Fix precision loss
             ))
             reward = utils.lmap(reward, [low, high], [0, 1])
         return reward
@@ -209,10 +211,11 @@ class UrbanRoadEnv(AbstractEnv):
         if not self.vehicle.crashed:
             # Use forward speed, see https://github.com/Farama-Foundation/HighwayEnv/issues/268
             forward_speed = self.vehicle.velocity[0] #self.vehicle.speed * np.cos(self.vehicle.heading)
+            forward_speed = max(forward_speed, 0.) # Fix precision loss
             # Low speed reward
             low_speed = self.config["low_speed_range"]
-            if low_speed[0] <= forward_speed <= low_speed[1]:
-                rewards["low_speed_reward"] = 1
+            if forward_speed <= low_speed[1] and low_speed[1] > 0:
+                rewards["low_speed_reward"] = forward_speed / low_speed[1]
             # High speed reward
             low_speed, desired_speed, high_speed = self.config["high_speed_range"]
             if low_speed <= forward_speed <= desired_speed:
