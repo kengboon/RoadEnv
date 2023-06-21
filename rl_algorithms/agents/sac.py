@@ -27,14 +27,16 @@ class SACAgent:
             recurrent=False
         ):
         if recurrent:
-            pass
+            self.actor = RecurrentActor(state_dim, action_dim, max_action).to(device)
+            self.critic = RecurrentCritic(state_dim, action_dim).to(device)
+            self.value_net = RecurrentCritic(state_dim, 0).to(device)
+            self.target_value_net = RecurrentCritic(state_dim, 0).to(device)
         else:
             self.actor = SoftActor(state_dim, action_dim, max_action).to(device)
             self.critic = Critic(state_dim, action_dim).to(device)
             self.value_net = Critic(state_dim, 0).to(device)
-
             self.target_value_net = Critic(state_dim, 0).to(device)
-            self.target_value_net.load_state_dict(self.value_net.state_dict())            
+        self.target_value_net.load_state_dict(self.value_net.state_dict())            
         self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=lr_actor)
         self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=lr_critic)
         self.value_net_optimizer = optim.Adam(self.value_net.parameters(), lr=lr_valuenet)
@@ -76,10 +78,16 @@ class SACAgent:
         next_state_batch = Variable(torch.from_numpy(np.array(next_state_batch)).float()).to(device)
         done_batch = Variable(torch.from_numpy(np.array(done_batch)).float()).to(device)
 
-        expected_q_value = self.critic(state_batch, action_batch)
-        expected_value = self.value_net(state_batch, None)
-        new_action, log_prob, z, mean, log_std = self.actor(state_batch)
-        target_value = self.target_value_net(next_state_batch, None)
+        if self.recurrent:
+            expected_q_value, _ = self.critic(state_batch, action_batch, self.hidden_state)
+            expected_value = self.value_net(state_batch, None)
+            new_action, log_prob, z, mean, log_std = self.actor(state_batch)
+            target_value = self.target_value_net(next_state_batch, None)
+        else:
+            expected_q_value = self.critic(state_batch, action_batch)
+            expected_value = self.value_net(state_batch, None)
+            new_action, log_prob, z, mean, log_std = self.actor(state_batch)
+            target_value = self.target_value_net(next_state_batch, None)
         next_q_value = reward_batch + (1 - done_batch) * self.gamma * target_value
         q_value_loss = F.mse_loss(expected_q_value, next_q_value.detach())
 
@@ -147,7 +155,7 @@ class SACAgent:
         else:
             self.critic = torch.load(os.path.join(dir, "critic.pth"), map_location=torch.device(device))
             self.value_net = torch.load(os.path.join(dir, "value_net.pth"), map_location=torch.device(device))
-            self.target_value_net.load_state_dict(self.value_net.state_dict())
+            self.target_value_net = torch.load(os.path.join(dir, "value_net.pth"), map_location=torch.device(device))
 
     def save(self, dir):
         os.makedirs(dir, exist_ok=True)
