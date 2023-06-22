@@ -26,7 +26,8 @@ class UrbanRoadEnv(AbstractEnv):
         config.update({
             "observation": {
                 "type": "LidarKinematicsObservation",
-                "features": ["presence", "on_road", "class", "y", "vx", "heading", "distance"],
+                "ego_features": ["y", "vx", "heading"],
+                "features": ["class", "on_road", "front_distance", "front_angle"],
                 "normalize": True,
                 "cells": 16,
                 "maximum_range": 60,
