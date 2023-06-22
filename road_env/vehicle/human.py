@@ -93,5 +93,4 @@ class Pedestrian(Vehicle):
     def to_dict(self, origin_vehicle: Vehicle = None, observe_intentions: bool = True) -> dict:
         d = super().to_dict(origin_vehicle, observe_intentions)
         d['class'] = 1
-        d['distance'] = self.distance_to_ego
         return d

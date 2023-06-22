@@ -1,4 +1,5 @@
 from abc import ABC
+import math
 from typing import Sequence, Tuple, TYPE_CHECKING, Optional
 import numpy as np
 
@@ -114,7 +115,7 @@ class RoadObject(ABC):
     def to_dict(self, origin_vehicle=None, observe_intentions=True):
         d = {
             'presence': 1,
-            'class': 0.5,
+            'class': 0,
             'x': self.position[0],
             'y': self.position[1],
             'vx': 0.,
@@ -125,7 +126,8 @@ class RoadObject(ABC):
             'cos_d': 0.,
             'sin_d': 0.,
             'on_road': int(self.on_road),
-            'distance': 0
+            'front_distance': 0,
+            'front_angle': 0
         }
         if not observe_intentions:
             d["cos_d"] = d["sin_d"] = 0
@@ -133,6 +135,8 @@ class RoadObject(ABC):
             origin_dict = origin_vehicle.to_dict()
             for key in ['x', 'y', 'vx', 'vy']:
                 d[key] -= origin_dict[key]
+            d['front_distance'] = self.front_distance_to(origin_vehicle)
+            d['front_angle'] = self.front_angle_to(origin_vehicle)
         return d
 
     @property
@@ -183,6 +187,11 @@ class RoadObject(ABC):
     def front_distance_to(self, other: "RoadObject") -> float:
         return self.direction.dot(other.position - self.position)
 
+    def front_angle_to(self, other: "RoadObject") -> float:
+        dx = self.position[0] - other.position[0]
+        dy = self.position[1] - other.position[1]
+        return -math.atan(-dx, dy) - other.heading
+
     def __str__(self):
         return f"{self.__class__.__name__} #{id(self) % 1000}: at {self.position}"
 
@@ -198,11 +207,6 @@ class Obstacle(RoadObject):
         super().__init__(road, position, heading, speed)
         self.solid = True
         self.check_collisions = False
-
-    def to_dict(self, origin_vehicle=None, observe_intentions=True):
-        d = super().to_dict(origin_vehicle, observe_intentions)
-        d['class'] = 0
-        return d
 
 class Landmark(RoadObject):
 
