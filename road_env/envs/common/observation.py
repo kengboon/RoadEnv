@@ -715,14 +715,14 @@ class LidarKinematicsObservation(ObservationType):
                 else:
                     self.unobserved.append(obstacle)
             df = pd.DataFrame.from_records([v.to_dict(self.observer_vehicle) for v in self.observed])[self.features]
-        if self.normalize:
-            df = self.normalize_obs(df)
+            if self.normalize:
+                df = self.normalize_obs(df)
+            # Flatten
+            obs = np.append(obs, df.values.copy())
         # Fill missing rows (zero padding)
-        if df.shape[0] < self.cells:
-            rows = np.zeros((self.cells - df.shape[0], len(self.features)))
-            df = pd.concat([df, pd.DataFrame(data=rows, columns=self.features)], ignore_index=True)
-        # Flatten
-        obs = np.append(obs, df.values.copy())
+        desired_len = len(self.ego_features) + self.cells * len(self.features)
+        if len(obs) < desired_len:
+            obs = np.append(obs, np.array([0 for _ in range(desired_len - len(obs))]))
         return np.nan_to_num(obs).astype(self.space().dtype)
 
     def close_obstacles_to(self, observer_vehicle, distance: Optional[float] = None, count: Optional[int] = None,
