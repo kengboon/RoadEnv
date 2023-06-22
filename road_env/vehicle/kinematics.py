@@ -201,9 +201,9 @@ class Vehicle(RoadObject):
             return np.zeros((3,))
 
     def to_dict(self, origin_vehicle: "Vehicle" = None, observe_intentions: bool = True) -> dict:
-        d = super().to_dict(origin_vehicle, observe_intentions)
-        d.update({
+        d = {
             'presence': 1,
+            'class': 0,
             'x': self.position[0],
             'y': self.position[1],
             'vx': self.velocity[0],
@@ -216,14 +216,17 @@ class Vehicle(RoadObject):
             'long_off': self.lane_offset[0],
             'lat_off': self.lane_offset[1],
             'ang_off': self.lane_offset[2],
-        })
+            'on_road': int(self.on_road),
+            'distance': 0,
+            'front_angle': 0
+        }
         if not observe_intentions:
             d["cos_d"] = d["sin_d"] = 0
         if origin_vehicle:
             origin_dict = origin_vehicle.to_dict()
             for key in ['x', 'y', 'vx', 'vy']:
                 d[key] -= origin_dict[key]
-            d['front_distance'] = self.front_distance_to(origin_vehicle)
+            d['distance'] = self.distance_to(origin_vehicle)
             d['front_angle'] = self.front_angle_to(origin_vehicle)
         return d
 

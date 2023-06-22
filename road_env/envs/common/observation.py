@@ -699,13 +699,11 @@ class LidarKinematicsObservation(ObservationType):
                                                   distance=self.maximum_range,
                                                   count=None)
         if close_obstacles:
-            origin = self.observer_vehicle.position
-
             for obstacle in close_obstacles:
                 # Determine obstruction
                 center_angle = obstacle.observed_angle
                 center_index = self.angle_to_index(center_angle)
-                center_distance = np.linalg.norm(obstacle.position - origin)
+                center_distance = obstacle.distance_to(self.observer_vehicle)
                 distance = center_distance - obstacle.WIDTH / 2
                 if self.observations[center_index][0] is None or distance < self.observations[center_index][0]:
                     if self.observations[center_index][1] is not None:
@@ -717,12 +715,12 @@ class LidarKinematicsObservation(ObservationType):
                 else:
                     self.unobserved.append(obstacle)
             df = pd.DataFrame.from_records([v.to_dict(self.observer_vehicle) for v in self.observed])[self.features]
-        # Fill missing rows
-        if df.shape[0] < self.cells:
-            rows = np.zeros((self.cells - df.shape[0], len(self.features)))
-            df = pd.concat([df, pd.DataFrame(data=rows, columns=self.features)], ignore_index=True)        
         if self.normalize:
             df = self.normalize_obs(df)
+        # Fill missing rows (zero padding)
+        if df.shape[0] < self.cells:
+            rows = np.zeros((self.cells - df.shape[0], len(self.features)))
+            df = pd.concat([df, pd.DataFrame(data=rows, columns=self.features)], ignore_index=True)
         # Flatten
         obs = np.append(obs, df.values.copy())
         return np.nan_to_num(obs).astype(self.space().dtype)
@@ -731,11 +729,11 @@ class LidarKinematicsObservation(ObservationType):
                            sort: bool = True) -> object:
         distance = distance or self.env.PERCEPTION_DISTANCE
         vehicles = [v for v in self.env.road.vehicles + self.env.road.objects
-                     if np.linalg.norm(v.position - observer_vehicle.position) < distance
-                     and v is not observer_vehicle
+                     if v is not observer_vehicle
+                     and v.distance_to(observer_vehicle) < distance
                      and (self.observe_angle[0] <= self.put_observed_angle(v) <= self.observe_angle[1])]
         if sort:
-            vehicles = sorted(vehicles, key = lambda v: np.linalg.norm(v.position - observer_vehicle.position))
+            vehicles = sorted(vehicles, key = lambda v: v.distance_to(observer_vehicle))
         if count:
             vehicles = vehicles[:count]
         return vehicles
@@ -750,8 +748,8 @@ class LidarKinematicsObservation(ObservationType):
                 "vx": [-2*Vehicle.MAX_SPEED, 2*Vehicle.MAX_SPEED],
                 "vy": [-2*Vehicle.MAX_SPEED, 2*Vehicle.MAX_SPEED],
                 "heading": [-np.pi, np.pi],
-                "distance": [0, self.env.PERCEPTION_DISTANCE],
-                "front_distance": [0, self.env.PERCEPTION_DISTANCE],
+                "distance": [0, self.maximum_range],
+                "front_distance": [0, self.maximum_range],
                 "front_angle": [-self.angle / 2, self.angle / 2]
             }
         for feature, f_range in self.features_range.items():

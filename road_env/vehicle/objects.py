@@ -126,7 +126,7 @@ class RoadObject(ABC):
             'cos_d': 0.,
             'sin_d': 0.,
             'on_road': int(self.on_road),
-            'front_distance': 0,
+            'distance': 0,
             'front_angle': 0
         }
         if not observe_intentions:
@@ -135,7 +135,7 @@ class RoadObject(ABC):
             origin_dict = origin_vehicle.to_dict()
             for key in ['x', 'y', 'vx', 'vy']:
                 d[key] -= origin_dict[key]
-            d['front_distance'] = self.front_distance_to(origin_vehicle)
+            d['distance'] = self.distance_to(origin_vehicle)
             d['front_angle'] = self.front_angle_to(origin_vehicle)
         return d
 
@@ -191,6 +191,9 @@ class RoadObject(ABC):
         dx = self.position[0] - other.position[0]
         dy = self.position[1] - other.position[1]
         return math.atan2(dy, dx) - other.heading
+
+    def distance_to(self, other: "RoadObject") -> float:
+        return np.linalg.norm(self.position - other.position)
 
     def __str__(self):
         return f"{self.__class__.__name__} #{id(self) % 1000}: at {self.position}"
