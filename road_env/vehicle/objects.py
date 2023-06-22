@@ -190,7 +190,7 @@ class RoadObject(ABC):
     def front_angle_to(self, other: "RoadObject") -> float:
         dx = self.position[0] - other.position[0]
         dy = self.position[1] - other.position[1]
-        return -math.atan2(-dx, dy) - other.heading
+        return math.atan2(dy, dx) - other.heading
 
     def __str__(self):
         return f"{self.__class__.__name__} #{id(self) % 1000}: at {self.position}"

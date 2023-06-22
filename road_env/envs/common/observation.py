@@ -1,4 +1,3 @@
-import math
 from collections import OrderedDict
 from itertools import product
 from typing import List, Dict, TYPE_CHECKING, Optional, Union, Tuple
@@ -734,7 +733,7 @@ class LidarKinematicsObservation(ObservationType):
         vehicles = [v for v in self.env.road.vehicles + self.env.road.objects
                      if np.linalg.norm(v.position - observer_vehicle.position) < distance
                      and v is not observer_vehicle
-                     and (self.observe_angle[0] <= self.put_observe_angle(v) <= self.observe_angle[1])]
+                     and (self.observe_angle[0] <= self.put_observed_angle(v) <= self.observe_angle[1])]
         if sort:
             vehicles = sorted(vehicles, key = lambda v: np.linalg.norm(v.position - observer_vehicle.position))
         if count:
@@ -750,10 +749,10 @@ class LidarKinematicsObservation(ObservationType):
                 "y": [-AbstractLane.DEFAULT_WIDTH * len(side_lanes), AbstractLane.DEFAULT_WIDTH * len(side_lanes)],
                 "vx": [-2*Vehicle.MAX_SPEED, 2*Vehicle.MAX_SPEED],
                 "vy": [-2*Vehicle.MAX_SPEED, 2*Vehicle.MAX_SPEED],
-                "heading": [-math.pi, math.pi],
+                "heading": [-np.pi, np.pi],
                 "distance": [0, self.env.PERCEPTION_DISTANCE],
                 "front_distance": [0, self.env.PERCEPTION_DISTANCE],
-                "front_angle": [-math.pi / 2, math.pi / 2]
+                "front_angle": [-self.angle / 2, self.angle / 2]
             }
         for feature, f_range in self.features_range.items():
             if feature in df:
@@ -762,15 +761,17 @@ class LidarKinematicsObservation(ObservationType):
                     df[feature] = np.clip(df[feature], -1, 1)
         return df
 
-    def put_observe_angle(self, obstacle):
-        obstacle.observed_angle = self.position_to_angle(obstacle.position, self.observer_vehicle.position)
+    def put_observed_angle(self, obstacle):
+        obstacle.observed_angle = self.get_observed_angle(obstacle, self.observer_vehicle)
         return obstacle.observed_angle
 
-    def position_to_angle(self, position: np.ndarray, origin: np.ndarray) -> float:
-        return np.arctan2(position[1] - origin[1], position[0] - origin[0])# + self.angle/2
+    def get_observed_angle(self, obstacle, origin) -> float:
+        dx = obstacle.position[0] - origin.position[0]
+        dy = obstacle.position[1] - origin.position[1]
+        return np.arctan2(dy, dx) - origin.heading
 
     def angle_to_index(self, angle: float) -> int:
-        return int(utils.lmap(angle, [-self.angle/2, self.angle/2], [0, self.cells-1]))
+        return int(utils.lmap(angle, [-self.angle / 2, self.angle / 2], [0, self.cells-1]))
 
 def observation_factory(env: 'AbstractEnv', config: dict) -> ObservationType:
     if config["type"] == "TimeToCollision":
