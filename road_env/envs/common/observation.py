@@ -1,3 +1,4 @@
+import math
 from collections import OrderedDict
 from itertools import product
 from typing import List, Dict, TYPE_CHECKING, Optional, Union, Tuple
@@ -637,8 +638,9 @@ class LidarKinematicsObservation(ObservationType):
                  env: 'AbstractEnv',
                  cells: int = 16,
                  maximum_range: float = 60,
+                 ego_features: Optional[List[str]] = None,
                  features: Optional[List[str]] = None,
-                 features_range: Dict[str, List[float]] = None,                 
+                 features_range: Dict[str, List[float]] = None,
                  see_behind: bool = False,
                  observe_angle: List[float] = [-1.57, 1.57],
                  see_offroad: bool = True,
@@ -651,6 +653,7 @@ class LidarKinematicsObservation(ObservationType):
                  **kwargs: dict) -> None:
         super().__init__(env, **kwargs)
         self.lidar_obs = LidarObservation(env, cells=cells, maximum_range=maximum_range, see_behind=see_behind, **kwargs)
+        self.ego_features = ego_features or self.FEATURES
         self.features = features or self.FEATURES
         self.features_range = features_range
         self.cells = cells
@@ -670,19 +673,27 @@ class LidarKinematicsObservation(ObservationType):
         self.reset_observations()
 
     def space(self) -> spaces.Space:
-        return spaces.Box(shape=(self.cells + 1, len(self.features)), low=np.inf, high=np.inf, dtype=np.float32)
+        ego_features_len = len(self.ego_features)
+        obs_features_len = self.cells * len(self.features)
+        low = -1 if self.normalize else -np.inf
+        high = 1 if self.normalize else np.inf
+        return spaces.Box(shape=(ego_features_len + obs_features_len,), low=low, high=high, dtype=np.float32)
 
     def reset_observations(self):
         self.observed = []
         self.unobserved = []
-        self.grid = [(None, None) for v in range(self.cells)]
+        self.observations = [(None, None) for v in range(self.cells)]
 
     def observe(self) -> np.ndarray:
         if self.display_grid:
             obs = self.lidar_obs.observe()
 
         # Add ego-vehicle
-        df = pd.DataFrame.from_records([self.observer_vehicle.to_dict()])[self.features]
+        df = pd.DataFrame.from_records([self.observer_vehicle.to_dict()])[self.ego_features]
+        if self.normalize:
+            self.normalize_obs(df)
+        obs = df.values.copy()
+
         # Add nearby traffic & obstacles
         self.reset_observations()
         close_obstacles = self.close_obstacles_to(self.observer_vehicle,
@@ -697,30 +708,24 @@ class LidarKinematicsObservation(ObservationType):
                 center_index = self.angle_to_index(center_angle)
                 center_distance = np.linalg.norm(obstacle.position - origin)
                 distance = center_distance - obstacle.WIDTH / 2
-                if self.grid[center_index][0] is None or distance < self.grid[center_index][0]:
-                    if self.grid[center_index][1] is not None:
+                if self.observations[center_index][0] is None or distance < self.observations[center_index][0]:
+                    if self.observations[center_index][1] is not None:
                         # Move to unobserved
-                        self.unobserved.append(self.grid[center_index][1])
-                        self.observed.remove(self.grid[center_index][1])
-                    self.grid[center_index] = (distance, obstacle)
+                        self.unobserved.append(self.observations[center_index][1])
+                        self.observed.remove(self.observations[center_index][1])
+                    self.observations[center_index] = (distance, obstacle)
                     self.observed.append(obstacle)
                 else:
                     self.unobserved.append(obstacle)
-            # Note: absolute x, y, vx, vy
-            df = pd.concat([df, pd.DataFrame.from_records(
-                [v.to_dict() for v in self.observed])[self.features]],
-                ignore_index=True)
-        # Normalize and clip
+            df = pd.DataFrame.from_records([v.to_dict(self.observer_vehicle) for v in self.observed])[self.features]
+        # Fill missing rows
+        if df.shape[0] < self.cells:
+            rows = np.zeros((self.cells - df.shape[0], len(self.features)))
+            df = pd.concat([df, pd.DataFrame(data=rows, columns=self.features)], ignore_index=True)        
         if self.normalize:
             df = self.normalize_obs(df)
-        # Fill missing rows
-        if df.shape[0] < self.cells + 1:
-            rows = np.zeros((self.cells + 1 - df.shape[0], len(self.features)))
-            df = pd.concat([df, pd.DataFrame(data=rows, columns=self.features)], ignore_index=True)
-        # Reorder
-        #df = df[self.features]
-        obs = df.values.copy()
         # Flatten
+        obs = np.append(obs, df.values.copy())
         return np.nan_to_num(obs).astype(self.space().dtype)
 
     def close_obstacles_to(self, observer_vehicle, distance: Optional[float] = None, count: Optional[int] = None,
@@ -745,8 +750,10 @@ class LidarKinematicsObservation(ObservationType):
                 "y": [-AbstractLane.DEFAULT_WIDTH * len(side_lanes), AbstractLane.DEFAULT_WIDTH * len(side_lanes)],
                 "vx": [-2*Vehicle.MAX_SPEED, 2*Vehicle.MAX_SPEED],
                 "vy": [-2*Vehicle.MAX_SPEED, 2*Vehicle.MAX_SPEED],
-                "heading": [-3.142, 3.142],
-                "distance": [0, self.env.PERCEPTION_DISTANCE]
+                "heading": [-math.pi, math.pi],
+                "distance": [0, self.env.PERCEPTION_DISTANCE],
+                "front_distance": [0, self.env.PERCEPTION_DISTANCE],
+                "front_angle": [-math.pi / 2, math.pi / 2]
             }
         for feature, f_range in self.features_range.items():
             if feature in df:
