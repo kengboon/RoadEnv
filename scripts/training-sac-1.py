@@ -14,7 +14,7 @@ import gymnasium as gym
 env = gym.make("urban-road-v0", render_mode="rgb_array")
 env.configure({
     "random_seed": None,
-    "duration": 60,
+    "duration": 100,
     "obstacle_preset": 4
 })
 
@@ -22,7 +22,7 @@ env.configure({
 print('Observation space', env.observation_space.shape)
 print('Action shape', env.action_space.shape)
 
-state_dim = env.observation_space.shape[0] * env.observation_space.shape[1]
+state_dim = env.observation_space.shape[0]
 action_dim = env.action_space.shape[0]
 max_action = env.action_space.high[0]
 print("State dim:", state_dim, "Action dim:", action_dim, "Max action:", max_action)
@@ -57,8 +57,8 @@ done = truncated = False
 
 import time
 import numpy as np
-max_epsilon = 1
-min_epsilon = .05
+max_epsilon = 0
+min_epsilon = 0
 decay_rate = 0.0005
 num_episode = 10000
 save_interval = 100
