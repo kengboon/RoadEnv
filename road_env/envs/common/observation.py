@@ -694,10 +694,10 @@ class LidarKinematicsObservation(ObservationType):
         obs = df.values.copy()
 
         # Add nearby traffic & obstacles
-        self.reset_observations()
         close_obstacles = self.close_obstacles_to(self.observer_vehicle,
                                                   distance=self.maximum_range,
                                                   count=None)
+        self.reset_observations()
         if close_obstacles:
             for obstacle in close_obstacles:
                 # Determine obstruction
@@ -714,15 +714,15 @@ class LidarKinematicsObservation(ObservationType):
                     self.observed.append(obstacle)
                 else:
                     self.unobserved.append(obstacle)
-            df = pd.DataFrame.from_records([v.to_dict(self.observer_vehicle) for v in self.observed])[self.features]
-            if self.normalize:
-                df = self.normalize_obs(df)
-            # Flatten
-            obs = np.append(obs, df.values.copy())
-        # Fill missing rows (zero padding)
-        desired_len = len(self.ego_features) + self.cells * len(self.features)
-        if len(obs) < desired_len:
-            obs = np.append(obs, np.array([0 for _ in range(desired_len - len(obs))]))
+        for o in self.observations:
+            if o[0] is not None and o[1] is not None:
+                df = pd.DataFrame(o[1].to_dict(self.observer_vehicle), index=[0])[self.features]
+                if self.normalize:
+                    df = self.normalize_obs(df)
+                    obs = np.append(obs, df.values.copy())
+            else:
+                # Fill missing row with zeros
+                obs = np.append(obs, np.array([0 for _ in range(len(self.features))]))
         return np.nan_to_num(obs).astype(self.space().dtype)
 
     def close_obstacles_to(self, observer_vehicle, distance: Optional[float] = None, count: Optional[int] = None,
