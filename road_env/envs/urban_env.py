@@ -42,7 +42,8 @@ class UrbanRoadEnv(AbstractEnv):
                 "lateral": True,
                 "acceleration_range": [-6.944, 2.778], # -25 km/h/s - 10 km/h/s
                 "steering_range": [-0.524, 0.524], # 30 degree in radian
-                "speed_range": [0, 22.222] # 80 km/h
+                "speed_range": [0, 22.222], # 80 km/h
+                "shift_normalize": True,
             },
             "random_seed": 42,
             "obstacle_preset": None,

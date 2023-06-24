@@ -92,6 +92,7 @@ class ContinuousAction(ActionType):
                  longitudinal: bool = True,
                  lateral: bool = True,
                  dynamical: bool = False,
+                 shift_normalize: bool = False,
                  clip: bool = True,
                  **kwargs) -> None:
         """
@@ -115,6 +116,7 @@ class ContinuousAction(ActionType):
         if not self.lateral and not self.longitudinal:
             raise ValueError("Either longitudinal and/or lateral control must be enabled")
         self.dynamical = dynamical
+        self.shift_normalize = shift_normalize
         self.clip = clip
         self.size = 2 if self.lateral and self.longitudinal else 1
         self.last_action = np.zeros(self.size)
@@ -133,21 +135,30 @@ class ContinuousAction(ActionType):
             self.controlled_vehicle.MIN_SPEED, self.controlled_vehicle.MAX_SPEED = self.speed_range
         if self.longitudinal and self.lateral:
             self.controlled_vehicle.act({
-                "acceleration": utils.lmap(action[0], [-1, 1], self.acceleration_range),
-                "steering": utils.lmap(action[1], [-1, 1], self.steering_range),
+                "acceleration": self._map_action(action[0], self.acceleration_range),
+                "steering": self._map_action(action[1], self.steering_range),
             })
         elif self.longitudinal:
             self.controlled_vehicle.act({
-                "acceleration": utils.lmap(action[0], [-1, 1], self.acceleration_range),
+                "acceleration": self._map_action(action[0], self.acceleration_range),
                 "steering": 0,
             })
         elif self.lateral:
             self.controlled_vehicle.act({
                 "acceleration": 0,
-                "steering": utils.lmap(action[0], [-1, 1], self.steering_range)
+                "steering": self._map_action(action[0], self.steering_range),
             })
         self.last_action = action
 
+    def _map_action(self, value, range):
+        if not self.shift_normalize:
+            return utils.lmap(value, [-1, 1], range)
+        else:
+            low, high = range
+            if value <= 0:
+                return utils.lmap(value, [-1, 0], [low, 0])
+            else:
+                return utils.lmap(value, [0, 1], [0, high])
 
 class DiscreteAction(ContinuousAction):
     def __init__(self,
