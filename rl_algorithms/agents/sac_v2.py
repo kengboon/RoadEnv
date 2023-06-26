@@ -141,11 +141,11 @@ class SACv2Agent:
         predicted_new_Q = torch.min(predicted_Q1, predicted_Q2)
         actor_loss = (self.alpha * log_prob - predicted_new_Q).mean()
 
-        mean_loss = 1e-3 * mean.pow(2).mean()
-        std_loss = 1e-3 * log_std.pow(2).mean()
-        z_loss = 1e-3 * z.pow(2).sum(1).mean()
+        #mean_loss = 1e-3 * mean.pow(2).mean()
+        #std_loss = 1e-3 * log_std.pow(2).mean()
+        #z_loss = 1e-3 * z.pow(2).sum(1).mean()
 
-        actor_loss += mean_loss + std_loss + z_loss
+        #actor_loss += mean_loss + std_loss + z_loss
 
         self.actor_optimizer.zero_grad()
         actor_loss.backward()
