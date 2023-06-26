@@ -71,13 +71,13 @@ class UrbanRoadEnv(AbstractEnv):
             },
             "duration": 99,  # Time step
             "collision_reward": -1,
+            "off_road_reward": -1,
             "low_speed_reward": -0.5,
-            "low_speed_range": [0, 5.556], # 0-20 km/h
-            "on_lane_reward": 0.1,
-            "on_road_reward": 0,
-            "high_speed_reward": 0.5,
-            "high_speed_range": [5.556, 16.667, 19.167], # 20-60-69 km/h
-            "normalize_reward": True,
+            "low_speed_range": [0, 8.333], # 0-20 km/h
+            "on_lane_reward": 0,
+            "high_speed_reward": 1,
+            "high_speed_range": [8.3333, 16.667, 19.167], # 20-60-69 km/h
+            "normalize_reward": False,
             "offroad_terminal": True,
             "show_trajectories": False
         })
@@ -176,27 +176,26 @@ class UrbanRoadEnv(AbstractEnv):
         self.pedestrians = self.road.pedestrians
 
     def _reward(self, action: Action) -> float:
-        rewards = self._rewards(action)
-        reward = sum(self.config.get(name, 0) * reward for name, reward in rewards.items())
-        if self.config["normalize_reward"]:
-            low = sum((
-                self.config["collision_reward"],
-                self.config["low_speed_reward"],
-                -0.01, # Fix precision loss
-            ))
-            high = sum((
-                self.config["on_road_reward"],
-                self.config["on_lane_reward"],
-                self.config["high_speed_reward"],
-                0.01, # Fix precision loss
-            ))
-            reward = utils.lmap(reward, [low, high], [0, 1])
+        if self.vehicle.crashed:
+            reward = self.config["collision_reward"]
+        elif not self.vehicle.on_road:
+            reward = self.config["off_road_reward"]
+        else:
+            rewards = self._rewards(action)
+            reward = sum(self.config.get(name, 0) * reward for name, reward in rewards.items())
+            if self.config["normalize_reward"]:
+                low = sum((
+                    self.config["low_speed_reward"],
+                ))
+                high = sum((
+                    self.config["on_lane_reward"],
+                    self.config["high_speed_reward"],
+                ))
+                reward = utils.lmap(reward, [low, high], [-1, 1])
         return reward
 
     def _rewards(self, action: Action) -> Dict[Text, float]:
         rewards = {
-            "collision_reward": self.vehicle.crashed,
-            "on_road_reward": self.vehicle.on_road,
             "on_lane_reward": 0,
             "high_speed_reward": 0,
             "low_speed_reward": 0,
@@ -217,7 +216,7 @@ class UrbanRoadEnv(AbstractEnv):
             # Low speed reward
             low_speed = self.config["low_speed_range"]
             if forward_speed <= low_speed[1] and low_speed[1] > 0:
-                rewards["low_speed_reward"] = forward_speed / low_speed[1]
+                rewards["low_speed_reward"] = (low_speed[1] - forward_speed) / low_speed[1]
             # High speed reward
             low_speed, desired_speed, high_speed = self.config["high_speed_range"]
             if low_speed <= forward_speed <= desired_speed:
