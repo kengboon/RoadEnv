@@ -54,6 +54,10 @@ while not (done or truncated):
 
 See [more examples](https://github.com/kengboon/RoadEnv/tree/main/scripts).
 
+## Resources
+- [Documentation of highway-env](http://highway-env.farama.org/)
+- Implementation of RL algorithms by [@quantumiracle](https://github.com/quantumiracle/Popular-RL-Algorithms)
+
 ## Citation
 
 ## Buy me a ☕
