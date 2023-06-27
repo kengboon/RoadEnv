@@ -48,13 +48,13 @@ class UrbanRoadEnv(AbstractEnv):
             "random_seed": 42,
             "obstacle_preset": None,
             "lanes_count": 4,
-            "road_length": 1000,
+            "road_length": 500,
             "speed_limit": 16.667, # 60 km/h
             "initial_lane_id": 1,
-            "obstacle_count": 80,
+            "obstacle_count": 30,
             "obstacle_size": 1.5,
             "pedestrians": {
-                "count": 50,
+                "count": 10,
                 "action": {
                     "type": "ContinuousAction",
                     "longitudinal": True,
@@ -69,7 +69,7 @@ class UrbanRoadEnv(AbstractEnv):
                     "probability": 0.333,
                 }
             },
-            "duration": 99,  # Time step
+            "duration": 100,  # Time step
             "collision_reward": -1,
             "off_road_reward": -1,
             "low_speed_reward": -0.5,
@@ -96,22 +96,22 @@ class UrbanRoadEnv(AbstractEnv):
         match self.config["obstacle_preset"]:
             case 1: # Low occlusion
                 self.configure({
-                    "obstacle_count": 20,
+                    "obstacle_count": 10,
                     "obstacle_size": 0.75
                 })
             case 2: # Medium occlusion
                 self.configure({
-                    "obstacle_count": 50,
+                    "obstacle_count": 25,
                     "obstacle_size": 1.5
                 })
             case 3: # High occlusion
                 self.configure({
-                    "obstacle_count": 100,
+                    "obstacle_count": 50,
                     "obstacle_size": 1.75
                 })
             case 4: # Random level
                 self.configure({
-                    "obstacle_count": self._generator.integers(20, 100),
+                    "obstacle_count": self._generator.integers(10, 50),
                     "obstacle_size": self._generator.random() + 0.75
                 })
 
@@ -156,7 +156,7 @@ class UrbanRoadEnv(AbstractEnv):
         for _ in range(self.config["pedestrians"]["count"]):
             lane_index = self._generator.choice((0, self.config["lanes_count"] - 1))
             lane = self.road.network.get_lane(("0", "1", lane_index))
-            pos_x = self._generator.integers(5, lane.end[0])
+            pos_x = self._generator.integers(50, lane.end[0])
             pos_y = -lane.width if lane_index == 0 else lane.width
             heading = self._generator.choice((0, np.pi))
             pedestrian = Pedestrian(
@@ -178,7 +178,7 @@ class UrbanRoadEnv(AbstractEnv):
     def _reward(self, action: Action) -> float:
         if self.vehicle.crashed:
             reward = self.config["collision_reward"]
-        elif not self.vehicle.on_road:
+        elif not (self.vehicle.on_road or self.vehicle.position[0] >= self.config["road_length"]):
             reward = self.config["off_road_reward"]
         else:
             rewards = self._rewards(action)
