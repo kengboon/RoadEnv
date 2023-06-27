@@ -2,7 +2,9 @@ import torch
 from torch.distributions import Normal
 import torch.nn as nn
 import torch.nn.functional as F
+import numpy as np
 
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
 hidden1 = 256
 hidden2 = 128
 
@@ -15,7 +17,7 @@ class SoftActor(nn.Module):
         self.mean = nn.Linear(hidden2, action_dim)
         self.log_std = nn.Linear(hidden2, action_dim)
 
-    def forward(self, state):
+    def forward(self, state, deterministic=True):
         # Forward pass
         x = F.relu(self.fc1(state))
         x = F.relu(self.fc2(x))
@@ -25,9 +27,17 @@ class SoftActor(nn.Module):
 
         # Get action
         std = log_std.exp()
+        normal = Normal(0, 1)
+        z = normal.sample().to(device)
+        prob = mean if deterministic else mean + std * z
+        if deterministic:
+            action = torch.tanh(prob) * self.max_action
+        else:
+            action = torch.tanh(prob) * self.max_action
+
         normal = Normal(mean, std)
-        z = normal.sample()
-        action = torch.tanh(z) * self.max_action
-        log_prob = normal.log_prob(z) - torch.log(1 - action.pow(2))
+        log_prob = normal.log_prob(prob)\
+            - torch.log(1 - action.pow(2))\
+            - np.log(self.max_action)
         log_prob = log_prob.sum(-1, keepdim=True)
         return action, log_prob, z, mean, log_std

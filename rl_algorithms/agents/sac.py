@@ -59,10 +59,10 @@ class SACAgent:
         state = Variable(torch.from_numpy(self.flatten_state(state)).float()).to(device)
         with torch.no_grad():
             if self.recurrent:
-                action, self.hidden_state = self.actor(state.unsqueeze(0), self.hidden_state)
+                action, self.hidden_state = self.actor(state.unsqueeze(0), self.hidden_state, True)
                 action = action[0]
             else:
-                action = self.actor(state)[0]
+                action = self.actor(state, True)[0]
         action = action.cpu().detach().numpy()
         return action
 
@@ -81,12 +81,12 @@ class SACAgent:
         if self.recurrent:
             expected_q_value, _ = self.critic(state_batch, action_batch, self.hidden_state)
             expected_value = self.value_net(state_batch, None)
-            new_action, log_prob, z, mean, log_std = self.actor(state_batch)
+            new_action, log_prob, z, mean, log_std = self.actor(state_batch, self.hidden_state, False)
             target_value = self.target_value_net(next_state_batch, None)
         else:
             expected_q_value = self.critic(state_batch, action_batch)
             expected_value = self.value_net(state_batch, None)
-            new_action, log_prob, z, mean, log_std = self.actor(state_batch)
+            new_action, log_prob, z, mean, log_std = self.actor(state_batch, False)
             target_value = self.target_value_net(next_state_batch, None)
         next_q_value = reward_batch + (1 - done_batch) * self.gamma * target_value
         q_value_loss = F.mse_loss(expected_q_value, next_q_value.detach())
@@ -98,11 +98,11 @@ class SACAgent:
         log_prob_target = expected_new_q_value - expected_value
         policy_loss = (log_prob * (log_prob - log_prob_target).detach()).mean()
 
-        mean_loss = 1e-3 * mean.pow(2).mean()
-        std_loss = 1e-3 * log_std.pow(2).mean()
-        z_loss = 1e-3 * z.pow(2).sum(1).mean()
+        #mean_loss = 1e-3 * mean.pow(2).mean()
+        #std_loss = 1e-3 * log_std.pow(2).mean()
+        #z_loss = 1e-3 * z.pow(2).sum(1).mean()
 
-        policy_loss += mean_loss + std_loss + z_loss
+        #policy_loss += mean_loss + std_loss + z_loss
 
         self.critic_optimizer.zero_grad()
         q_value_loss.backward()

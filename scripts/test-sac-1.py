@@ -15,16 +15,16 @@ env = gym.make("urban-road-v0", render_mode="rgb_array")
 env.configure({
     "random_seed": None,
     "duration": None,
-    "obstacle_preset": None
+    "obstacle_preset": 4
 })
 env.config["obstacle_count"] = 0
-env.config["pedestrians"]["count"] = 0
+#env.config["pedestrians"]["count"] = 0
 
 # %% Get dimensions
 print('Observation space', env.observation_space.shape)
 print('Action shape', env.action_space.shape)
 
-state_dim = env.observation_space.shape[0] * env.observation_space.shape[1]
+state_dim = env.observation_space.shape[0]
 action_dim = env.action_space.shape[0]
 max_action = env.action_space.high[0]
 print("State dim:", state_dim, "Action dim:", action_dim, "Max action:", max_action)
@@ -39,7 +39,7 @@ agent = SACAgent(
     action_dim=action_dim,
     max_action=max_action,
     hidden_size=128)
-agent.load_model('models/sac-230620195940/4000', device)
+agent.load('models/sac-230626200110/9999', device)
 
 obs, info = env.reset()
 done = truncated = False
