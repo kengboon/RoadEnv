@@ -15,7 +15,7 @@ env = gym.make("urban-road-v0", render_mode="rgb_array")
 env.configure({
     "random_seed": None,
     "duration": 100,
-    "obstacle_preset": 4
+    "obstacle_preset": 4,
 })
 
 # %% Get dimensions
@@ -73,10 +73,10 @@ import time
 import numpy as np
 AUTO_ENTROPY=True
 DETERMINISTIC = False
-max_epsilon = 0
-min_epsilon = 0
-decay_rate = 0.0005
-num_episode = 10000
+max_epsilon = 1
+min_epsilon = 0.05
+decay_rate = 0.001
+num_episode = 100000
 save_interval = 100
 avg_reward_step_interval = 100
 curr_step = 0
@@ -94,9 +94,9 @@ for episode in range(num_episode):
 
     while True: # Use config["duration"] to truncate
         if np.random.rand() < epsilon:
-            action = env.action_space.sample()
+            action = ppo.choose_action(obs, deterministic=False)
         else:
-            action = ppo.choose_action(obs)
+            action = ppo.choose_action(obs, deterministic=True)
         #print(action)
 
         next_obs, reward, done, truncated, info = env.step(action)
