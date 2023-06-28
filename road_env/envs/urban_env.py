@@ -75,9 +75,12 @@ class UrbanRoadEnv(AbstractEnv):
             "low_speed_reward": -0.5,
             "low_speed_range": [0, 8.333], # 0-20 km/h
             "on_lane_reward": 0,
-            "high_speed_reward": 1,
+            "heading_reward": 0.5,
+            "high_speed_reward": 0.5,
             "high_speed_range": [8.3333, 16.667, 19.167], # 20-60-69 km/h
             "normalize_reward": False,
+            "reward_range": [-1, 1],
+            "clip_reward": True,
             "offroad_terminal": True,
             "show_trajectories": False
         })
@@ -114,7 +117,6 @@ class UrbanRoadEnv(AbstractEnv):
                     "obstacle_count": self._generator.integers(10, 50),
                     "obstacle_size": self._generator.random() + 0.75
                 })
-
 
     def _make_road(self) -> None:
         road_network = RoadNetwork.straight_road_network(
@@ -190,8 +192,11 @@ class UrbanRoadEnv(AbstractEnv):
                 high = sum((
                     self.config["on_lane_reward"],
                     self.config["high_speed_reward"],
+                    self.config["heading_reward"],
                 ))
-                reward = utils.lmap(reward, [low, high], [-1, 1])
+                reward = utils.lmap(reward, [low, high], self.config["reward_range"])
+        if self.config["clip_reward"]:
+            reward = np.clip(reward, self.config["reward_range"][0], self.config["reward_range"][1])
         return reward
 
     def _rewards(self, action: Action) -> Dict[Text, float]:
@@ -199,17 +204,23 @@ class UrbanRoadEnv(AbstractEnv):
             "on_lane_reward": 0,
             "high_speed_reward": 0,
             "low_speed_reward": 0,
+            "heading_reward": 0,
         }
-        # On-lane reward if no collision
+
         if not self.vehicle.crashed:
+            # On-lane reward
             if self.vehicle_lane == self.vehicle.lane_index[2]:
                 rewards["on_lane_reward"] = 1
             elif self.vehicle.lane_index[2] not in (0, self.config["lanes_count"]-1):
                 rewards["on_lane_reward"] = 0.5
             self.vehicle_lane = self.vehicle.lane_index[2]
 
-        # Speed reward if no collision
-        if not self.vehicle.crashed:
+            # Heading reward
+            heading = abs(self.vehicle.heading)
+            if heading < np.pi / 2:
+                rewards["heading_reward"] = 1 - utils.lmap(heading, [0, np.pi / 2], [0, 1])
+
+            # Speed reward
             # Use forward speed, see https://github.com/Farama-Foundation/HighwayEnv/issues/268
             forward_speed = self.vehicle.velocity[0] #self.vehicle.speed * np.cos(self.vehicle.heading)
             forward_speed = max(forward_speed, 0.) # Fix precision loss
