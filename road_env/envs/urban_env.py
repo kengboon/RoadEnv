@@ -72,10 +72,11 @@ class UrbanRoadEnv(AbstractEnv):
             "duration": 100,  # Time step
             "collision_reward": -1,
             "off_road_reward": -1,
+            "off_lane_reward": -.75,
             "low_speed_reward": -0.5,
             "low_speed_range": [0, 8.333], # 0-20 km/h
             "on_lane_reward": 0,
-            "heading_reward": 0.5,
+            "heading_reward": 0,
             "high_speed_reward": 0.5,
             "high_speed_range": [8.3333, 16.667, 19.167], # 20-60-69 km/h
             "normalize_reward": False,
@@ -182,6 +183,8 @@ class UrbanRoadEnv(AbstractEnv):
             reward = self.config["collision_reward"]
         elif not (self.vehicle.on_road or self.vehicle.position[0] >= self.config["road_length"]):
             reward = self.config["off_road_reward"]
+        elif self.vehicle.lane_index[2] in (0, self.config["lanes_count"] - 1):
+            reward = self.config["off_lane_reward"]
         else:
             rewards = self._rewards(action)
             reward = sum(self.config.get(name, 0) * reward for name, reward in rewards.items())
