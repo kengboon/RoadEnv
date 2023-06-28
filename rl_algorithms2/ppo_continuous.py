@@ -308,9 +308,9 @@ class PPO(object):
         torch.save(self.actor_old.state_dict(), path+'_actor_old')
 
     def load_model(self, path):
-        self.actor.load_state_dict(torch.load(path+'_actor'))
-        self.critic.load_state_dict(torch.load(path+'_critic'))
-        self.actor_old.load_state_dict(torch.load(path+'_actor_old'))
+        self.actor.load_state_dict(torch.load(path+'_actor', map_location=torch.device(device)))
+        self.critic.load_state_dict(torch.load(path+'_critic', map_location=torch.device(device)))
+        self.actor_old.load_state_dict(torch.load(path+'_actor_old', map_location=torch.device(device)))
 
         self.actor.eval()
         self.critic.eval()
