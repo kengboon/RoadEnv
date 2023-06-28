@@ -40,11 +40,11 @@ ppo = PPO(
     hidden_dim=hidden_dim,
 )
 
-from datetime import datetime
 model_type = "ppo_cont2"
 train_id = "230627174457"
-episode = "500"
-model_dir = "models/" + model_type + "-" + train_id + "/" + episode
+episode = "5000"
+model_dir = "../../data/models/" + model_type + "-" + train_id + "/" + episode
+ppo.load_model(model_dir)
 
 # %% Testing
 obs, info = env.reset()
@@ -57,7 +57,7 @@ for episode in range(num_episode):
     episode_reward = 0
 
     while True: # Use config["duration"] to truncate
-        action = ppo.choose_action(obs)
+        action = ppo.choose_action(obs, greedy=True)
         print(action)
 
         next_obs, reward, done, truncated, info = env.step(action)
