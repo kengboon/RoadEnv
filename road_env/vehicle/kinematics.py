@@ -130,6 +130,7 @@ class Vehicle(RoadObject):
             self.impact = None
         self.heading += self.speed * np.sin(beta) / (self.LENGTH / 2) * dt
         self.speed += self.action['acceleration'] * dt
+        self.speed = np.clip(self.speed, self.MIN_SPEED, self.MAX_SPEED)
         self.on_state_update()
 
     def clip_actions(self) -> None:
