@@ -75,14 +75,17 @@ AUTO_ENTROPY=True
 DETERMINISTIC = False
 max_epsilon = 1
 min_epsilon = 0.05
-decay_rate = 0.001
+decay_rate = 0.0005
 num_episode = 100000
 save_interval = 100
 avg_reward_step_interval = 100
 curr_step = 0
 batch_size = 1
-update_batch = 1024
+update_batch = 100
 total_start_time = time.time()
+
+epsilon_steps = [1 - (i+1) * .05 for i in range(19)]
+print(epsilon_steps)
 
 ppo.init_buffer()
 for episode in range(num_episode):
@@ -91,26 +94,29 @@ for episode in range(num_episode):
     num_steps = 0
     episode_reward = 0
     epsilon = min_epsilon + (max_epsilon - min_epsilon) * np.exp(-decay_rate * episode)
+    #epsilon = epsilon_steps[int(episode / (num_episode / len(epsilon_steps)))]
 
     while True: # Use config["duration"] to truncate
         if np.random.rand() < epsilon:
-            action = ppo.choose_action(obs, deterministic=False)
+            action = env.action_space.sample()
         else:
-            action = ppo.choose_action(obs, deterministic=True)
+            action = ppo.choose_action(obs, deterministic=False)
         #print(action)
 
         next_obs, reward, done, truncated, info = env.step(action)
 
-        time_step_rewards.append(reward)
-        curr_step += 1
-        if curr_step % avg_reward_step_interval == 0:
-            save_avg_rewards()
-            curr_step = 0
-
         # Update PPO
         ppo.append_buffer(obs, action, reward, done)
-        if (num_steps+1) % update_batch == 0:
+        if (curr_step+1) % update_batch == 0:
             ppo.compute_update(next_obs, done)
+
+        #time_step_rewards.append(reward)
+        curr_step += 1
+        #if curr_step % avg_reward_step_interval == 0:
+        #    save_avg_rewards()
+        #    curr_step = 0
+
+        
 
         obs = next_obs
         num_steps += 1
