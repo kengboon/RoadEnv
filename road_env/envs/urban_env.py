@@ -69,10 +69,12 @@ class UrbanRoadEnv(AbstractEnv):
                     "probability": 0.333,
                 }
             },
-            "duration": 100,  # Time step
+            "duration": 500,  # Time step
             "collision_reward": -1,
             "off_road_reward": -1,
             "off_lane_reward": -.75,
+            "prolong_static_reward": -.75,
+            "prolong_static_count": [20, 100],
             "low_speed_reward": -0.5,
             "low_speed_range": [0, 8.333], # 0-20 km/h
             "on_lane_reward": 0,
@@ -140,6 +142,7 @@ class UrbanRoadEnv(AbstractEnv):
         self.road.vehicles.append(ego_vehicle)
         self.vehicle = ego_vehicle
         self.vehicle_lane = self.config["initial_lane_id"]
+        self.static_counter = 0
 
     def _make_obstacles(self) -> None:
         for _ in range(self.config["obstacle_count"]):
@@ -208,6 +211,7 @@ class UrbanRoadEnv(AbstractEnv):
             "high_speed_reward": 0,
             "low_speed_reward": 0,
             "heading_reward": 0,
+            "prolong_static_reward": 0,
         }
 
         if not self.vehicle.crashed:
@@ -227,6 +231,19 @@ class UrbanRoadEnv(AbstractEnv):
             # Use forward speed, see https://github.com/Farama-Foundation/HighwayEnv/issues/268
             forward_speed = self.vehicle.velocity[0] #self.vehicle.speed * np.cos(self.vehicle.heading)
             forward_speed = max(forward_speed, 0.) # Fix precision loss
+            if int(forward_speed) == 0:
+                self.static_counter += 0
+                if self.static_counter >= self.config["prolong_static_count"][0]:
+                    if self.static_counter >= self.config["prolong_static_count"][1]:
+                        rewards["prolong_static_reward"] = 1
+                    else:
+                        rewards["prolong_static_reward"] = utils.lmap(
+                            self.static_counter,
+                            self.config["prolong_static_count"],
+                            [0, 1])
+            else:
+                self.static_counter = 0
+
             # Low speed reward
             low_speed = self.config["low_speed_range"]
             if forward_speed <= low_speed[1] and low_speed[1] > 0:
