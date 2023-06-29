@@ -252,11 +252,21 @@ class UrbanRoadEnv(AbstractEnv):
         return False
     
     def get_performance(self):
+        # Log last ego vehicle state
+        d = {
+            "collided": self.vehicle.crashed,
+            "complete": not self.vehicle.on_road and self.vehicle.position[0] >= self.config["road_length"],
+            "off_road": not self.vehicle.on_road,
+            "position": self.vehicle.position,
+            "lane_id": self.vehicle.lane_index[2],
+            "velocity": self.vehicle.velocity,
+            "heading": self.vehicle.heading,
+        }
         # Count pedestrian crossed the road
         p_crossed = sum(map(lambda x: x.crossed, self.road.pedestrians))
         p_percent = p_crossed / self.config["pedestrians"]["count"] * 100.\
             if self.config["pedestrians"]["count"] > 0 else 0
-        return {
-            "count": p_crossed,
-            "percentage": p_percent
-        }
+        d.update({
+            "pedestrians_crossed": (p_crossed, p_percent),
+        })
+        return d
