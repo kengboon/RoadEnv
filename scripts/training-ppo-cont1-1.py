@@ -14,8 +14,11 @@ import gymnasium as gym
 env = gym.make("urban-road-v0", render_mode="rgb_array")
 env.configure({
     "random_seed": None,
-    "duration": 100,
+    "duration": 500,
     "obstacle_preset": 4,
+    #"low_speed_reward": -1,
+    #"low_speed_range": [0, 0.001],
+    #"high_speed_range": [0.001, 16.667, 19.167]
 })
 
 # %% Get dimensions
@@ -37,6 +40,10 @@ ppo = PPO(
     action_range=max_action,
     hidden_dim=hidden_dim,
 )
+
+import rl_algorithms2.ppo_continuous as ppo_
+ppo_.A_UPDATE_STEPS = 2
+ppo_.C_UPDATE_STEPS = 2
 
 from datetime import datetime
 model_type = "ppo_cont1"
@@ -79,13 +86,13 @@ decay_rate = 0.0005
 num_episode = 100000
 save_interval = 100
 avg_reward_step_interval = 100
-curr_step = 0
+cumulate_steps = 0
 batch_size = 1
 update_batch = 100
 total_start_time = time.time()
 
-epsilon_steps = [1 - (i+1) * .05 for i in range(19)]
-print(epsilon_steps)
+#epsilon_steps = [1 - (i+1) * .05 for i in range(19)]
+#print(epsilon_steps)
 
 ppo.init_buffer()
 for episode in range(num_episode):
@@ -107,11 +114,12 @@ for episode in range(num_episode):
 
         # Update PPO
         ppo.append_buffer(obs, action, reward, done)
-        if (curr_step+1) % update_batch == 0:
+        if (cumulate_steps+1) % update_batch == 0:
             ppo.compute_update(next_obs, done)
+            cumulate_steps = 0
 
         #time_step_rewards.append(reward)
-        curr_step += 1
+        cumulate_steps += 1
         #if curr_step % avg_reward_step_interval == 0:
         #    save_avg_rewards()
         #    curr_step = 0
@@ -124,6 +132,7 @@ for episode in range(num_episode):
         #env.render() # Note: Do not render during training
 
         if done or truncated:
+            print(env.get_performance())
             obs, info = env.reset()
             break
 
