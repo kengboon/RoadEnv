@@ -42,7 +42,7 @@ class UrbanRoadEnv(AbstractEnv):
                 "lateral": True,
                 "acceleration_range": [-6.944, 2.778], # -25 km/h/s - 10 km/h/s
                 "steering_range": [-0.524, 0.524], # 30 degree in radian
-                "speed_range": [0, 22.222], # 80 km/h
+                "speed_range": [0, 19.167], # 69 km/h
                 "shift_normalize": True,
             },
             "random_seed": 42,
@@ -77,7 +77,7 @@ class UrbanRoadEnv(AbstractEnv):
             "low_speed_range": [0, 8.333], # 0-20 km/h
             "on_lane_reward": 0,
             "heading_reward": 0,
-            "high_speed_reward": 0.5,
+            "high_speed_reward": 1,
             "high_speed_range": [8.3333, 16.667, 19.167], # 20-60-69 km/h
             "normalize_reward": False,
             "reward_range": [-1, 1],
@@ -180,11 +180,11 @@ class UrbanRoadEnv(AbstractEnv):
 
     def _reward(self, action: Action) -> float:
         if self.vehicle.crashed:
-            reward = self.config["collision_reward"]
+            reward = self.config["collision_reward"] * 1
         elif not (self.vehicle.on_road or self.vehicle.position[0] >= self.config["road_length"]):
-            reward = self.config["off_road_reward"]
+            reward = self.config["off_road_reward"] * 1
         elif self.vehicle.lane_index[2] in (0, self.config["lanes_count"] - 1):
-            reward = self.config["off_lane_reward"]
+            reward = self.config["off_lane_reward"] * 1
         else:
             rewards = self._rewards(action)
             reward = sum(self.config.get(name, 0) * reward for name, reward in rewards.items())
