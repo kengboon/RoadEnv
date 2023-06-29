@@ -243,20 +243,19 @@ class UrbanRoadEnv(AbstractEnv):
                             [0, 1])
             else:
                 self.static_counter = 0
-
-            # Low speed reward
-            low_speed = self.config["low_speed_range"]
-            if forward_speed <= low_speed[1] and low_speed[1] > 0:
-                rewards["low_speed_reward"] = (low_speed[1] - forward_speed) / low_speed[1]
-            # High speed reward
-            low_speed, desired_speed, high_speed = self.config["high_speed_range"]
-            if low_speed <= forward_speed <= desired_speed:
-                speed_tolerance = desired_speed - low_speed
-            elif desired_speed <= forward_speed <= high_speed:
-                speed_tolerance = high_speed - desired_speed
-            if low_speed <= forward_speed <= high_speed:
-                speed_diff = abs(forward_speed - desired_speed)
-                rewards["high_speed_reward"] = speed_diff / speed_tolerance
+                # Low speed reward
+                low_speed = self.config["low_speed_range"]
+                if forward_speed <= low_speed[1] and low_speed[1] > 0:
+                    rewards["low_speed_reward"] = (low_speed[1] - forward_speed) / low_speed[1]
+                # High speed reward
+                low_speed, desired_speed, high_speed = self.config["high_speed_range"]
+                if low_speed <= forward_speed <= desired_speed:
+                    speed_tolerance = desired_speed - low_speed
+                elif desired_speed <= forward_speed <= high_speed:
+                    speed_tolerance = high_speed - desired_speed
+                if low_speed <= forward_speed <= high_speed:
+                    speed_diff = abs(forward_speed - desired_speed)
+                    rewards["high_speed_reward"] = speed_diff / speed_tolerance
         return rewards
 
     def _is_terminated(self) -> bool:
