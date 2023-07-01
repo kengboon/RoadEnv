@@ -82,13 +82,13 @@ AUTO_ENTROPY=True
 DETERMINISTIC = False
 max_epsilon = 1
 min_epsilon = 0.05
-decay_rate = 0.0005
+decay_rate = 0.0001
 num_episode = 100000
 save_interval = 100
 avg_reward_step_interval = 100
 cumulate_steps = 0
 batch_size = 1
-update_batch = 100
+update_batch = 32
 total_start_time = time.time()
 
 #epsilon_steps = [1 - (i+1) * .05 for i in range(19)]
@@ -132,7 +132,7 @@ for episode in range(num_episode):
         #env.render() # Note: Do not render during training
 
         if done or truncated:
-            print(env.get_performance())
+            env_perf = env.get_performance()
             obs, info = env.reset()
             break
 
@@ -147,6 +147,7 @@ for episode in range(num_episode):
         "Elapsed": end_time - start_time,
         "Total Elapsed": end_time - total_start_time
     }
+    episode_log.update(env_perf)
     print(episode_log)
 
     training_logs.append(episode_log)
