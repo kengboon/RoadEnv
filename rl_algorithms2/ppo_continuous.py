@@ -77,6 +77,29 @@ class ValueNetwork(nn.Module):
         # x = F.relu(self.linear3(x))
         x = self.linear4(x)
         return x
+
+class RecurrentValueNetwork(nn.Module):
+    def __init__(self, state_dim, hidden_dim):
+        super().__init__()
+        self.hidden_dim = hidden_dim
+        self.lstm = nn.LSTM(state_dim, hidden_dim)
+        self.output = nn.Linear(hidden_dim, 1)
+        self.hidden_state = None
+
+    def forward(self, state):
+        if self.hidden_state is None:
+            self.init_hidden(state.size(0))
+
+        x, self.hidden_state = self.lstm(state, self.hidden_state)
+        x = torch.tanh(x)
+        x = self.output(x)
+        return x
+
+    def init_hidden(self, size):
+        self.hidden_state = (
+            torch.zeros(1, self.hidden_dim).to(device),
+            torch.zeros(1, self.hidden_dim).to(device)
+        )
         
 class PolicyNetwork(nn.Module):
     def __init__(self, num_inputs, num_actions, hidden_dim, action_range=1., init_w=3e-3, log_std_min=-20, log_std_max=2):
@@ -136,14 +159,68 @@ class PolicyNetwork(nn.Module):
         a=torch.FloatTensor(self.num_actions).uniform_(-1, 1)
         return a.numpy()
 
+class RecurrentPolicyNetwork(nn.Module):
+    def __init__(self, num_inputs, num_actions, hidden_dim, action_range=1., init_w=3e-3, log_std_min=-20, log_std_max=2):
+        super().__init__()
+        self.log_std_min = log_std_min
+        self.log_std_max = log_std_max
+        self.hidden_dim = hidden_dim
+
+        self.lstm = nn.LSTM(num_inputs, hidden_dim)
+        self.mean_linear = nn.Linear(hidden_dim, num_actions)
+        self.log_std = AddBias(torch.zeros(num_actions))  
+
+        self.num_actions = num_actions
+        self.action_range = action_range
+        self.hidden_state = None
+
+    def forward(self, state):
+        if self.hidden_state is None:
+            self.init_hidden(state.size(0))
+
+        x, self.hidden_state = self.lstm(state, self.hidden_state)
+        x = torch.tanh(x)
+
+        mean = self.action_range * torch.tanh(self.mean_linear(x))
+        zeros = torch.zeros(mean.size())
+        if state.is_cuda:
+            zeros = zeros.cuda()
+        log_std = self.log_std(zeros)
+
+        return mean, log_std
+        
+    def get_action(self, state, deterministic=False):
+        state = torch.FloatTensor(state).unsqueeze(0).to(device)
+        mean, log_std = self.forward(state)
+
+        if deterministic:
+            action = mean
+        else:
+            std = log_std.exp()
+            normal = Normal(mean, std)
+            action = normal.sample() 
+        action = torch.clamp(action, -self.action_range, self.action_range)
+        return action.squeeze(0)
+
+    def init_hidden(self, size):
+        self.hidden_state = (
+            torch.zeros(1, self.hidden_dim).to(device),
+            torch.zeros(1, self.hidden_dim).to(device)
+        )
+
 class PPO(object):
     '''
     PPO class
     '''
-    def __init__(self, state_dim, action_dim, action_range=1., hidden_dim=512, a_lr=3e-4, c_lr=3e-4):
-        self.actor = PolicyNetwork(state_dim, action_dim, hidden_dim, action_range).to(device)
-        self.actor_old = PolicyNetwork(state_dim, action_dim, hidden_dim, action_range).to(device)
-        self.critic = ValueNetwork(state_dim, hidden_dim).to(device)
+    def __init__(self, state_dim, action_dim, action_range=1., hidden_dim=512, a_lr=3e-4, c_lr=3e-4, recurrent=False):
+        if not recurrent:
+            self.actor = PolicyNetwork(state_dim, action_dim, hidden_dim, action_range).to(device)
+            self.actor_old = PolicyNetwork(state_dim, action_dim, hidden_dim, action_range).to(device)
+            self.critic = ValueNetwork(state_dim, hidden_dim).to(device)
+        else:
+            self.actor = RecurrentPolicyNetwork(state_dim, action_dim, hidden_dim, action_range).to(device)
+            self.actor_old = RecurrentPolicyNetwork(state_dim, action_dim, hidden_dim, action_range).to(device)
+            self.critic = RecurrentValueNetwork(state_dim, hidden_dim).to(device)
         self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=a_lr)
         self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=c_lr)
         print(self.actor, self.critic)
@@ -301,6 +378,10 @@ class PPO(object):
         # return self.critic(s).detach().cpu().numpy()[0, 0]
         return self.critic(s).squeeze(0).detach().cpu().numpy()
 
+    def reset_state(self):
+        self.actor.hidden_state = None
+        self.actor_old.hidden_state = None
+        self.critic.hidden_state = None
 
     def save_model(self, path):
         torch.save(self.actor.state_dict(), path+'_actor')
