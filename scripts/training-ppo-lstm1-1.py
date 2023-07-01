@@ -104,23 +104,12 @@ for episode in range(num_episode):
             action = env.action_space.sample()
         else:
             action = ppo.choose_action(obs, deterministic=False)
-        print(action)
+        #print(action)
 
         next_obs, reward, done, truncated, info = env.step(action)
 
         # Update PPO
         ppo.append_buffer(obs, action, reward, done)
-        if (cumulate_steps+1) % update_batch == 0:
-            ppo.compute_update(next_obs, done)
-            cumulate_steps = 0
-
-        #time_step_rewards.append(reward)
-        cumulate_steps += 1
-        #if curr_step % avg_reward_step_interval == 0:
-        #    save_avg_rewards()
-        #    curr_step = 0
-
-        
 
         obs = next_obs
         num_steps += 1
@@ -128,7 +117,8 @@ for episode in range(num_episode):
         #env.render() # Note: Do not render during training
 
         if done or truncated:
-            print(env.get_performance())
+            ppo.compute_update(next_obs, done)
+            env_perf = env.get_performance()
             obs, info = env.reset()
             break
 
@@ -143,6 +133,7 @@ for episode in range(num_episode):
         "Elapsed": end_time - start_time,
         "Total Elapsed": end_time - total_start_time
     }
+    episode_log.update(env_perf)
     print(episode_log)
 
     training_logs.append(episode_log)
