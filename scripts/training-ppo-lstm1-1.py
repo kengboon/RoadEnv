@@ -44,7 +44,7 @@ ppo_.A_UPDATE_STEPS = 1
 ppo_.C_UPDATE_STEPS = 1
 
 from datetime import datetime
-model_type = "ppo_cont1"
+model_type = "ppo_lstm1"
 train_id = datetime.now().strftime("%y%m%d%H%M%S")
 model_dir = "models/" + model_type + "-" + train_id
 
@@ -83,11 +83,13 @@ min_epsilon = 0.05
 decay_rate = 0.0005
 num_episode = 100000
 save_interval = 100
-avg_reward_step_interval = 100
 cumulate_steps = 0
+cumulate_episode = 0
 batch_size = 1
 update_batch = 32
 total_start_time = time.time()
+reset_state_episode = 10
+reset_state_steps = 32
 
 ppo.init_buffer()
 for episode in range(num_episode):
@@ -95,9 +97,7 @@ for episode in range(num_episode):
     start_time = time.time()
     num_steps = 0
     episode_reward = 0
-    epsilon = min_epsilon + (max_epsilon - min_epsilon) * np.exp(-decay_rate * episode)
-
-    ppo.reset_state()
+    epsilon = min_epsilon + (max_epsilon - min_epsilon) * np.exp(-decay_rate * episode)    
 
     while True: # Use config["duration"] to truncate
         if np.random.rand() < epsilon:
@@ -110,6 +110,7 @@ for episode in range(num_episode):
 
         # Update PPO
         ppo.append_buffer(obs, action, reward, done)
+        cumulate_steps += 1
 
         obs = next_obs
         num_steps += 1
@@ -117,7 +118,15 @@ for episode in range(num_episode):
         #env.render() # Note: Do not render during training
 
         if done or truncated:
-            ppo.compute_update(next_obs, done)
+            if cumulate_episode >= reset_state_episode or cumulate_steps >= reset_state_steps:
+                print("Reset hidden state and update..")
+                ppo.reset_state()
+                ppo.compute_update(next_obs, done)
+                cumulate_episode = 0
+                cumulate_steps = 0
+            else:
+                cumulate_episode += 1
+
             env_perf = env.get_performance()
             obs, info = env.reset()
             break
