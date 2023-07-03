@@ -77,10 +77,10 @@ max_epsilon = 0
 min_epsilon = 0
 decay_rate = 0.0005
 num_episode = 10000
-save_interval = 20
-avg_reward_step_interval = 20
-curr_step = 0
-batch_size = 1
+save_interval = 100
+update_interval_steps = 100
+last_update_step = 99999
+batch_size = 32
 update_itr = 1
 total_start_time = time.time()
 for episode in range(num_episode):
@@ -95,27 +95,28 @@ for episode in range(num_episode):
             action = trainer.policy_net.sample_action()
         else:
             action = trainer.policy_net.get_action(obs, deterministic=DETERMINISTIC)
-        print(action)
+        #print(action)
         next_obs, reward, done, truncated, info = env.step(action)
 
         time_step_rewards.append(reward)
-        curr_step += 1
-        if curr_step % avg_reward_step_interval == 0:
-            save_avg_rewards()
-            curr_step = 0
 
         # Update agent
         replay_buffer.push(obs, action, reward, next_obs, done)
-        if len(replay_buffer) > batch_size:
+        if last_update_step > update_interval_steps and len(replay_buffer) > batch_size:
             for i in range(update_itr):
+                print("Update SAC...")
                 trainer.update(batch_size, reward_scale=10., auto_entropy=AUTO_ENTROPY, target_entropy=-1.*action_dim)
+            last_update_step = 0
+        else:
+            last_update_step += 1
 
         obs = next_obs
         num_steps += 1
         episode_reward += reward
-        env.render() # Note: Do not render during training
+        #env.render() # Note: Do not render during training
 
         if done or truncated:
+            env_perf = env.get_performance()
             obs, info = env.reset()
             break
 
@@ -130,6 +131,7 @@ for episode in range(num_episode):
         "Elapsed": end_time - start_time,
         "Total Elapsed": end_time - total_start_time
     }
+    episode_log.update(env_perf)
     print(episode_log)
 
     training_logs.append(episode_log)
