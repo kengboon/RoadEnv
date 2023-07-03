@@ -75,8 +75,8 @@ import torch
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 AUTO_ENTROPY=True
 DETERMINISTIC = False
-max_epsilon = 0
-min_epsilon = 0
+max_epsilon = 1
+min_epsilon = 0.05
 decay_rate = 0.0005
 num_episode = 10000
 save_interval = 100
@@ -93,6 +93,17 @@ episode_last_action = []
 episode_rewards = []
 episode_next_state = []
 episode_done = []
+
+last_action = None
+hidden_out = None
+def random_action():
+    global last_action, hidden_out
+    last_action = env.action_space.sample()
+    # initialize hidden state for lstm, (hidden, cell), each is (layer, batch, dim)
+    hidden_out = (torch.zeros([1, 1, hidden_dim], dtype=torch.float).to(device), \
+        torch.zeros([1, 1, hidden_dim], dtype=torch.float).to(device))
+
+random_action() # For first step
 for episode in range(num_episode):
     print('Episode', episode+1)
     obs, info = env.reset()
@@ -102,12 +113,10 @@ for episode in range(num_episode):
     episode_reward = 0
     epsilon = min_epsilon + (max_epsilon - min_epsilon) * np.exp(-decay_rate * episode)
 
-    last_action = env.action_space.sample()
-    # initialize hidden state for lstm, (hidden, cell), each is (layer, batch, dim)
-    hidden_out = (torch.zeros([1, 1, hidden_dim], dtype=torch.float).to(device), \
-        torch.zeros([1, 1, hidden_dim], dtype=torch.float).to(device))
-
     while True: # Use config["duration"] to truncate
+        if np.random.rand() < epsilon:
+            random_action()
+
         hidden_in = hidden_out
         action, hidden_out = trainer.policy_net.get_action(obs, last_action, hidden_in, deterministic=DETERMINISTIC)
         #print(action)
