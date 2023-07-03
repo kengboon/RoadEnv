@@ -40,8 +40,8 @@ ppo = PPO(
 )
 
 import rl_algorithms2.ppo_continuous as ppo_
-ppo_.A_UPDATE_STEPS = 1
-ppo_.C_UPDATE_STEPS = 1
+ppo_.A_UPDATE_STEPS = 2
+ppo_.C_UPDATE_STEPS = 2
 
 from datetime import datetime
 model_type = "ppo_lstm1"
