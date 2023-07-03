@@ -137,6 +137,7 @@ for episode in range(num_episode):
     training_logs.append(episode_log)
     if episode > 0 and episode % save_interval == 0 or episode == num_episode - 1:        
         save_training_logs(episode==0)
-        trainer.save_model(os.path.join(model_dir, str(episode)) + "/")
+        os.makedirs(model_dir, exist_ok=True)
+        trainer.save_model(model_dir + "/" + str(episode))
 
 env.close()
