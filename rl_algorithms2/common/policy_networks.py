@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from torch.distributions import Normal
 import math
 from .initialize import *
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 class PolicyNetworkBase(nn.Module):
     """ Base network class for policy function """
@@ -68,7 +69,7 @@ class DPG_PolicyNetwork(PolicyNetworkBase):
         '''
         normal = Normal(0, 1)
         action = self.forward(state)
-        noise = noise_scale * normal.sample(action.shape).cuda()
+        noise = noise_scale * normal.sample(action.shape).to(device)
         action = self.action_range*action+noise
         return action
 
@@ -77,10 +78,10 @@ class DPG_PolicyNetwork(PolicyNetworkBase):
         '''
         select action for sampling, no gradients flow, noisy action, return .cpu
         '''
-        state = torch.FloatTensor(state).unsqueeze(0).cuda() # state dim: (N, dim of state)
+        state = torch.FloatTensor(state).unsqueeze(0).to(device) # state dim: (N, dim of state)
         normal = Normal(0, 1)
         action = self.forward(state)
-        noise = noise_scale * normal.sample(action.shape).cuda()
+        noise = noise_scale * normal.sample(action.shape).to(device)
         action=self.action_range*action + noise
         return action.detach().cpu().numpy()[0]
 
@@ -141,7 +142,7 @@ class DPG_PolicyNetworkLSTM(PolicyNetworkBase):
         '''
         normal = Normal(0, 1)
         action, hidden_out = self.forward(state, last_action, hidden_in)
-        noise = noise_scale * normal.sample(action.shape).cuda()
+        noise = noise_scale * normal.sample(action.shape).to(device)
         action = self.action_range*action+noise
         return action, hidden_out
 
@@ -149,11 +150,11 @@ class DPG_PolicyNetworkLSTM(PolicyNetworkBase):
         '''
         select action for sampling, no gradients flow, noisy action, return .cpu
         '''
-        state = torch.FloatTensor(state).unsqueeze(0).unsqueeze(0).cuda() # increase 2 dims to match with training data
-        last_action = torch.FloatTensor(last_action).unsqueeze(0).unsqueeze(0).cuda()
+        state = torch.FloatTensor(state).unsqueeze(0).unsqueeze(0).to(device) # increase 2 dims to match with training data
+        last_action = torch.FloatTensor(last_action).unsqueeze(0).unsqueeze(0).to(device)
         normal = Normal(0, 1)
         action, hidden_out = self.forward(state, last_action, hidden_in)
-        noise = noise_scale * normal.sample(action.shape).cuda()
+        noise = noise_scale * normal.sample(action.shape).to(device)
         action=self.action_range*action + noise
         return action.detach().cpu().numpy()[0][0], hidden_out
 
@@ -210,7 +211,7 @@ class DPG_PolicyNetworkLSTM2(PolicyNetworkBase):
         '''
         normal = Normal(0, 1)
         action, hidden_out = self.forward(state, last_action, hidden_in)
-        noise = noise_scale * normal.sample(action.shape).cuda()
+        noise = noise_scale * normal.sample(action.shape).to(device)
         action = self.action_range*action+noise
         return action, hidden_out
 
@@ -218,11 +219,11 @@ class DPG_PolicyNetworkLSTM2(PolicyNetworkBase):
         '''
         select action for sampling, no gradients flow, noisy action, return .cpu
         '''
-        state = torch.FloatTensor(state).unsqueeze(0).unsqueeze(0).cuda() # increase 2 dims to match with training data
-        last_action = torch.FloatTensor(last_action).unsqueeze(0).unsqueeze(0).cuda()
+        state = torch.FloatTensor(state).unsqueeze(0).unsqueeze(0).to(device) # increase 2 dims to match with training data
+        last_action = torch.FloatTensor(last_action).unsqueeze(0).unsqueeze(0).to(device)
         normal = Normal(0, 1)
         action, hidden_out = self.forward(state, last_action, hidden_in)
-        noise = noise_scale * normal.sample(action.shape).cuda()
+        noise = noise_scale * normal.sample(action.shape).to(device)
         action=self.action_range*action + noise
         return action.detach().cpu().numpy()[0][0], hidden_out
 
@@ -273,7 +274,7 @@ class TD3_PolicyNetwork(PolicyNetworkBase):
         noise,
         -eval_noise_clip,
         eval_noise_clip)
-        action = self.action_range*action + noise.cuda()
+        action = self.action_range*action + noise.to(device)
 
         return action
         
@@ -282,7 +283,7 @@ class TD3_PolicyNetwork(PolicyNetworkBase):
         '''
         generate action for interaction with env
         '''
-        state = torch.FloatTensor(state).unsqueeze(0).cuda()
+        state = torch.FloatTensor(state).unsqueeze(0).to(device)
         action = self.forward(state)
 
         action = action.detach().cpu().numpy()[0] 
@@ -338,9 +339,9 @@ class SAC_PolicyNetwork(PolicyNetworkBase):
         
         normal = Normal(0, 1)
         z = normal.sample(mean.shape)
-        action_0 = torch.tanh(mean + std * z.cuda())  # TanhNormal distribution as actions; reparameterization trick
+        action_0 = torch.tanh(mean + std * z.to(device))  # TanhNormal distribution as actions; reparameterization trick
         action = self.action_range * action_0
-        log_prob = Normal(mean, std).log_prob(mean + std * z.cuda()) - torch.log(
+        log_prob = Normal(mean, std).log_prob(mean + std * z.to(device)) - torch.log(
             1. - action_0.pow(2) + epsilon) - np.log(self.action_range)
         # both dims of normal.log_prob and -log(1-a**2) are (N,dim_of_action);
         # the Normal.log_prob outputs the same dim of input features instead of 1 dim probability,
@@ -349,12 +350,12 @@ class SAC_PolicyNetwork(PolicyNetworkBase):
         return action, log_prob, z, mean, log_std
 
     def get_action(self, state, deterministic=True):
-        state = torch.FloatTensor(state).unsqueeze(0).cuda()
+        state = torch.FloatTensor(state).unsqueeze(0).to(device)
         mean, log_std = self.forward(state)
         std = log_std.exp()
         
         normal = Normal(0, 1)
-        z = normal.sample(mean.shape).cuda()
+        z = normal.sample(mean.shape).to(device)
         action = self.action_range * torch.tanh(mean + std * z)
 
         action = self.action_range * torch.tanh(mean).detach().cpu().numpy()[0] if deterministic else \
@@ -422,9 +423,9 @@ class SAC_PolicyNetworkLSTM(PolicyNetworkBase):
         
         normal = Normal(0, 1)
         z = normal.sample(mean.shape)
-        action_0 = torch.tanh(mean + std * z.cuda())  # TanhNormal distribution as actions; reparameterization trick
+        action_0 = torch.tanh(mean + std * z.to(device))  # TanhNormal distribution as actions; reparameterization trick
         action = self.action_range * action_0
-        log_prob = Normal(mean, std).log_prob(mean + std * z.cuda()) - torch.log(
+        log_prob = Normal(mean, std).log_prob(mean + std * z.to(device)) - torch.log(
             1. - action_0.pow(2) + epsilon) - np.log(self.action_range)
         # both dims of normal.log_prob and -log(1-a**2) are (N,dim_of_action);
         # the Normal.log_prob outputs the same dim of input features instead of 1 dim probability,
@@ -433,13 +434,13 @@ class SAC_PolicyNetworkLSTM(PolicyNetworkBase):
         return action, log_prob, z, mean, log_std, hidden_out
 
     def get_action(self, state, last_action, hidden_in, deterministic=True):
-        state = torch.FloatTensor(state).unsqueeze(0).unsqueeze(0).cuda()  # increase 2 dims to match with training data
-        last_action = torch.FloatTensor(last_action).unsqueeze(0).unsqueeze(0).cuda()
+        state = torch.FloatTensor(state).unsqueeze(0).unsqueeze(0).to(device)  # increase 2 dims to match with training data
+        last_action = torch.FloatTensor(last_action).unsqueeze(0).unsqueeze(0).to(device)
         mean, log_std, hidden_out = self.forward(state, last_action, hidden_in)
         std = log_std.exp()
         
         normal = Normal(0, 1)
-        z = normal.sample(mean.shape).cuda()
+        z = normal.sample(mean.shape).to(device)
         action = self.action_range * torch.tanh(mean + std * z)
 
         action = self.action_range * torch.tanh(mean).detach().cpu().numpy() if deterministic else \
@@ -507,9 +508,9 @@ class SAC_PolicyNetworkGRU(PolicyNetworkBase):
         
         normal = Normal(0, 1)
         z = normal.sample(mean.shape)
-        action_0 = torch.tanh(mean + std * z.cuda())  # TanhNormal distribution as actions; reparameterization trick
+        action_0 = torch.tanh(mean + std * z.to(device))  # TanhNormal distribution as actions; reparameterization trick
         action = self.action_range * action_0
-        log_prob = Normal(mean, std).log_prob(mean + std * z.cuda()) - torch.log(
+        log_prob = Normal(mean, std).log_prob(mean + std * z.to(device)) - torch.log(
             1. - action_0.pow(2) + epsilon) - np.log(self.action_range)
         # both dims of normal.log_prob and -log(1-a**2) are (N,dim_of_action);
         # the Normal.log_prob outputs the same dim of input features instead of 1 dim probability,
@@ -518,13 +519,13 @@ class SAC_PolicyNetworkGRU(PolicyNetworkBase):
         return action, log_prob, z, mean, log_std, hidden_out
 
     def get_action(self, state, last_action, hidden_in, deterministic=True):
-        state = torch.FloatTensor(state).unsqueeze(0).unsqueeze(0).cuda()  # increase 2 dims to match with training data
-        last_action = torch.FloatTensor(last_action).unsqueeze(0).unsqueeze(0).cuda()
+        state = torch.FloatTensor(state).unsqueeze(0).unsqueeze(0).to(device)  # increase 2 dims to match with training data
+        last_action = torch.FloatTensor(last_action).unsqueeze(0).unsqueeze(0).to(device)
         mean, log_std, hidden_out = self.forward(state, last_action, hidden_in)
         std = log_std.exp()
         
         normal = Normal(0, 1)
-        z = normal.sample(mean.shape).cuda()
+        z = normal.sample(mean.shape).to(device)
         action = self.action_range * torch.tanh(mean + std * z)
 
         action = self.action_range * torch.tanh(mean).detach().cpu().numpy() if deterministic else \
