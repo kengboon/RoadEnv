@@ -60,11 +60,11 @@ class SAC_Trainer():
         hidden_in, hidden_out, state, action, last_action, reward, next_state, done = self.replay_buffer.sample(batch_size)
         # print('sample:', state, action,  reward, done)
 
-        state      = torch.FloatTensor(state).to(device)
-        next_state = torch.FloatTensor(next_state).to(device)
-        action     = torch.FloatTensor(action).to(device)
-        last_action     = torch.FloatTensor(last_action).to(device)
-        reward     = torch.FloatTensor(reward).unsqueeze(-1).to(device)  # reward is single value, unsqueeze() to add one dim to be [reward] at the sample dim;
+        state      = torch.FloatTensor(np.array(state)).to(device)
+        next_state = torch.FloatTensor(np.array(next_state)).to(device)
+        action     = torch.FloatTensor(np.array(action)).to(device)
+        last_action     = torch.FloatTensor(np.array(last_action)).to(device)
+        reward     = torch.FloatTensor(np.array(reward)).unsqueeze(-1).to(device)  # reward is single value, unsqueeze() to add one dim to be [reward] at the sample dim;
         done       = torch.FloatTensor(np.float32(done)).unsqueeze(-1).to(device)
 
         predicted_q_value1, _ = self.soft_q_net1(state, action, last_action, hidden_in)
