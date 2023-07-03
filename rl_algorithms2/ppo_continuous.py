@@ -90,8 +90,9 @@ class RecurrentValueNetwork(nn.Module):
         if self.hidden_state is None:
             self.init_hidden(state.size(0))
 
-        x, self.hidden_state = self.lstm(state, self.hidden_state)
-        x = torch.tanh(x)
+        x, (hx, cx) = self.lstm(state, self.hidden_state)
+        self.hidden_state = (hx.detach().clone(), cx.detach().clone())
+        x = F.relu(x)
         x = self.output(x)
         return x
 
@@ -178,8 +179,9 @@ class RecurrentPolicyNetwork(nn.Module):
         if self.hidden_state is None:
             self.init_hidden(state.size(0))
 
-        x, self.hidden_state = self.lstm(state, self.hidden_state)
-        x = torch.tanh(x)
+        x, (hx, cx) = self.lstm(state, self.hidden_state)
+        self.hidden_state = (hx.detach().clone(), cx.detach().clone())
+        x = F.relu(x)
 
         mean = self.action_range * torch.tanh(self.mean_linear(x))
         zeros = torch.zeros(mean.size())
