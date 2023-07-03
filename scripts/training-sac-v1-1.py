@@ -46,7 +46,7 @@ ppo_.A_UPDATE_STEPS = 2
 ppo_.C_UPDATE_STEPS = 2
 
 from datetime import datetime
-model_type = "ppo_cont1"
+model_type = "sac-v1"
 train_id = datetime.now().strftime("%y%m%d%H%M%S")
 model_dir = "models/" + model_type + "-" + train_id
 
