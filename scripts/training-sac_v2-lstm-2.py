@@ -14,7 +14,7 @@ import gymnasium as gym
 env = gym.make("urban-road-v0", render_mode="rgb_array")
 env.configure({
     "random_seed": None,
-    "duration": 100,
+    "duration": 500,
     "obstacle_preset": 4
 })
 
@@ -82,8 +82,8 @@ num_episode = 10000
 save_interval = 100
 update_interval_steps = 32
 last_update_step = 99999
-batch_size = 2 # Episode
-size_per_batch = 32 #
+batch_size = 2 # Sampling from replay buffer
+size_per_batch = 32 # Steps
 update_itr = 1
 total_start_time = time.time()
 
@@ -100,10 +100,10 @@ def random_action():
     global last_action, hidden_out
     last_action = env.action_space.sample()
     # initialize hidden state for lstm, (hidden, cell), each is (layer, batch, dim)
+    print("Reset hidden state...")
     hidden_out = (torch.zeros([1, 1, hidden_dim], dtype=torch.float).to(device), \
         torch.zeros([1, 1, hidden_dim], dtype=torch.float).to(device))
 
-random_action() # For first step
 for episode in range(num_episode):
     print('Episode', episode+1)
     obs, info = env.reset()
@@ -113,17 +113,21 @@ for episode in range(num_episode):
     episode_reward = 0
     epsilon = min_epsilon + (max_epsilon - min_epsilon) * np.exp(-decay_rate * episode)
 
+    # For start of batch == start of episode
+    if len(episode_state) == 0:
+        random_action()
+
     while True: # Use config["duration"] to truncate
-        if np.random.rand() < epsilon:
-            random_action()
+        #if np.random.rand() < epsilon:
+        #    random_action()
 
         hidden_in = hidden_out
         action, hidden_out = trainer.policy_net.get_action(obs, last_action, hidden_in, deterministic=DETERMINISTIC)
         #print(action)
         next_obs, reward, done, truncated, info = env.step(action)
 
-        if num_steps == 0:
-            # Initialize hidden state
+        if len(episode_state) == 0:
+            # Initial hidden state
             ini_hidden_in = hidden_in
             ini_hidden_out = hidden_out
 
@@ -134,8 +138,12 @@ for episode in range(num_episode):
         episode_next_state.append(next_obs)
         episode_done.append(done)
 
+        obs = next_obs
+        last_action = action
+
         if len(episode_state) == size_per_batch:
             # Push to replay buffer
+            print("Push to replay buffer...")
             replay_buffer.push(ini_hidden_in, ini_hidden_out, episode_state, episode_action, episode_last_action, \
                 episode_rewards, episode_next_state, episode_done)
             # Reset - note: point to new empty list
@@ -145,9 +153,15 @@ for episode in range(num_episode):
             episode_rewards = []
             episode_next_state = []
             episode_done = []
+            # Randomly reset hidden state for next batch
+            if np.random.rand() < epsilon:
+                random_action()
 
-        # Update agent
-        if len(replay_buffer) > batch_size and last_update_step >= update_interval_steps:
+        # Minimum interval between update
+        min_buff_len = size_per_batch / update_interval_steps * batch_size
+        auto_interval = update_interval_steps if len(replay_buffer) >= min_buff_len else size_per_batch
+        if len(replay_buffer) > batch_size and last_update_step >= auto_interval:
+            # Update agent
             for i in range(update_itr):
                 print("Update SAC-LSTM...")
                 trainer.update(batch_size, reward_scale=10., auto_entropy=AUTO_ENTROPY, target_entropy=-1.*action_dim)
@@ -155,8 +169,6 @@ for episode in range(num_episode):
         else:
             last_update_step += 1
 
-        obs = next_obs
-        last_action = action
         num_steps += 1
         episode_reward += reward
         #env.render() # Note: Do not render during training
