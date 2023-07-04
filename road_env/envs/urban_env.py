@@ -119,7 +119,7 @@ class UrbanRoadEnv(AbstractEnv):
             case 4: # Random level
                 self.configure({
                     "obstacle_count": self._generator.integers(10, 50),
-                    "obstacle_size": self._generator.random() + 0.75
+                    "obstacle_size": None
                 })
 
     def _make_road(self) -> None:
@@ -153,8 +153,11 @@ class UrbanRoadEnv(AbstractEnv):
                 self.road,
                 lane.position(pos_x, 0),
             )
-            width = self._generator.random() + self.config["obstacle_size"]
-            length = width + self._generator.random() * width
+            if self.config["obstacle_size"] is not None:
+                width = self._generator.uniform() + self.config["obstacle_size"]
+            else:
+                width = self._generator.uniform(0.75, 2)
+            length = width + self._generator.uniform() * width
             obstacle.change_size(length, width)
             obstacle.color = RoadObjectGraphics.BLUE
             self.road.objects.append(obstacle)
@@ -163,7 +166,7 @@ class UrbanRoadEnv(AbstractEnv):
         for _ in range(self.config["pedestrians"]["count"]):
             lane_index = self._generator.choice((0, self.config["lanes_count"] - 1))
             lane = self.road.network.get_lane(("0", "1", lane_index))
-            pos_x = self._generator.integers(50, lane.end[0])
+            pos_x = self._generator.integers(50, lane.end[0]-20)
             pos_y = -lane.width if lane_index == 0 else lane.width
             heading = self._generator.choice((0, np.pi))
             pedestrian = Pedestrian(
