@@ -64,9 +64,9 @@ class UrbanRoadEnv(AbstractEnv):
                     "speed_range": [0, 0.833] # 3 km/h
                 },
                 "crossing": {
-                    "min_distance": 5,
-                    "max_distance": 50,
-                    "probability": 0.333,
+                    "min_distance": [0, 5],
+                    "max_distance": [20, 50],
+                    "probability": 0.1,
                 }
             },
             "duration": 500,  # Time step

@@ -36,6 +36,11 @@ class Pedestrian(Vehicle):
         self.target_heading = self.heading
         self.crossing = False
         self.crossed = False
+        min_dist = self.config["min_distance"]
+        self.min_distance = utils.lmap(self.road.np_random.random(), [0, 1], min_dist) if len(min_dist) == 2 else min_dist
+        max_dist = self.config["max_distance"]
+        self.max_distance = utils.lmap(self.road.np_random.random(), [0, 1], max_dist) if len(max_dist) == 2 else max_dist
+        self.crossing_probability = self.config["probability"]
 
     def act(self, action: dict | str = None) -> None:
         if action:
@@ -55,9 +60,9 @@ class Pedestrian(Vehicle):
             # Evaluate to start crossing the road
             if self.ego_vehicle and not self.crossing and not self.crossed:
                 # Check ego vehicle distance within range
-                if self.config["min_distance"] <= self.distance_to_ego <= self.config["max_distance"]:
+                if self.min_distance <= self.distance_to_ego <= self.max_distance:
                     # Probability of crossing road
-                    self.crossing = self.road.np_random.random() < self.config["probability"]
+                    self.crossing = self.road.np_random.random() < self.crossing_probability
                     self.crossed = False
 
             # Steer angle to cross the road
