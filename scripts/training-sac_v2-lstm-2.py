@@ -66,7 +66,7 @@ import torch
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 AUTO_ENTROPY=True
 DETERMINISTIC = False
-max_epsilon = 1
+max_epsilon = 0.5
 min_epsilon = 0.05
 decay_rate = 0.0005
 num_episode = 10000
@@ -75,9 +75,9 @@ update_interval_episode = 2
 non_update_episode_count = -1
 batch_size = 2 # Episode
 min_batch_size = 4
-max_batch_size = 64
-min_seq_sizes = 0, 8, 16, 32
-min_seq_size_ep_interval = 2500
+max_batch_size = 16
+sequence_length = 50
+min_seq_len = 10
 update_itr = 1
 total_start_time = time.time()
 
@@ -133,6 +133,26 @@ for episode in range(num_episode):
         episode_next_state.append(next_obs)
         episode_done.append(done)
 
+        # Sequence length is shorter than max steps
+        if len(episode_state) == sequence_length:
+            #print('Push to replay buffer...')
+            replay_buffer.push(
+                ini_hidden_in,
+                ini_hidden_out,
+                episode_state,
+                episode_action,
+                episode_last_action,
+                episode_rewards,
+                episode_next_state,
+                episode_done)
+            # Reset - note: point to new empty list
+            episode_state = []
+            episode_action = []
+            episode_last_action = []
+            episode_rewards = []
+            episode_next_state = []
+            episode_done = []
+
         obs = next_obs
         last_action = action
 
@@ -144,16 +164,24 @@ for episode in range(num_episode):
             env_perf = env.get_performance()
             break
 
-    #print('Push to replay buffer...')
-    replay_buffer.push(
-        ini_hidden_in,
-        ini_hidden_out,
-        episode_state,
-        episode_action,
-        episode_last_action,
-        episode_rewards,
-        episode_next_state,
-        episode_done)
+    if len(episode_state) >= min_seq_len:
+        # Padding and push
+        while len(episode_state) < sequence_length:
+            episode_state.append(obs)
+            episode_action.append(action)
+            episode_last_action.append(last_action)
+            episode_rewards.append(reward)
+            episode_next_state.append(next_obs)
+            episode_done.append(done)
+        replay_buffer.push(
+            ini_hidden_in,
+            ini_hidden_out,
+            episode_state,
+            episode_action,
+            episode_last_action,
+            episode_rewards,
+            episode_next_state,
+            episode_done)
     # Reset - note: point to new empty list
     episode_state = []
     episode_action = []
@@ -164,17 +192,12 @@ for episode in range(num_episode):
 
     # Minimum interval between update
     if len(replay_buffer) >= min_batch_size and non_update_episode_count >= update_interval_episode:
-        batch_size = min(int(len(replay_buffer) / 2), max_batch_size)
-        min_seq_size = int(episode / min_seq_size_ep_interval)
-        if min_seq_size >= len(min_seq_sizes):
-            min_seq_size = max(min_seq_sizes)
-        else:
-            min_seq_size = min_seq_sizes[min_seq_size]
+        batch_size = min(int(len(replay_buffer) / 2), max_batch_size)        
         # Update agent
         for i in range(update_itr):
-            print("Update SAC-LSTM... Batch size:", batch_size, "Min sequence length:", min_seq_size)
+            print("Update SAC-LSTM... Batch size:", batch_size, 'from:', len(replay_buffer))
             updated = trainer.update(batch_size, reward_scale=10., auto_entropy=AUTO_ENTROPY, target_entropy=-1.*action_dim,
-                                     min_seq_size=min_seq_size) or updated
+                                     min_seq_size=None) or updated
             print('Sampled min sequence len:', trainer.min_seq_len)
         if updated:
             non_update_episode_count = 0
