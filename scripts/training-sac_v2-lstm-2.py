@@ -57,15 +57,6 @@ def save_training_logs(writeheader=False):
         writer.writerows(training_logs)
     training_logs.clear()
 
-time_step_rewards = []
-def save_avg_rewards():
-    os.makedirs("logs/train", exist_ok=True)
-    log_path = "logs/train/" + model_type + "-" + train_id + "-rewards.csv"
-    with open(log_path, "a", newline="") as file:
-        file.write(str(sum(time_step_rewards) / len(time_step_rewards)))
-        file.write("\n")
-    time_step_rewards.clear()
-
 obs, info = env.reset()
 done = truncated = False
 
@@ -85,8 +76,8 @@ non_update_episode_count = -1
 batch_size = 2 # Episode
 min_batch_size = 4
 max_batch_size = 64
-min_seq_sizes = 0, 16, 32
-min_seq_size_ep_interval = 2000
+min_seq_sizes = 0, 8, 16, 32
+min_seq_size_ep_interval = 2500
 update_itr = 1
 total_start_time = time.time()
 
@@ -209,9 +200,9 @@ for episode in range(num_episode):
     print(episode_log)
 
     training_logs.append(episode_log)
-    if episode > 0 and episode % save_interval == 0 or episode == num_episode - 1:        
-        save_training_logs(episode==0)        
+    if episode > 0 and (episode+1) % save_interval == 0 or episode == num_episode - 1:
+        save_training_logs(episode+1==save_interval)
         os.makedirs(model_dir, exist_ok=True)
-        trainer.save_model(model_dir + "/" + str(episode))
+        trainer.save_model(model_dir + "/" + str(episode+1))
 
 env.close()
