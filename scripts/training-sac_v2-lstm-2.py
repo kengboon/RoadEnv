@@ -80,10 +80,13 @@ min_epsilon = 0.05
 decay_rate = 0.0005
 num_episode = 10000
 save_interval = 100
-update_interval_steps = 32
-last_update_step = 99999
-batch_size = 2 # Sampling from replay buffer
-size_per_batch = 32 # Steps
+update_interval_episode = 2
+non_update_episode_count = -1
+batch_size = 2 # Episode
+min_batch_size = 4
+max_batch_size = 64
+min_seq_sizes = 0, 16, 32
+min_seq_size_ep_interval = 2000
 update_itr = 1
 total_start_time = time.time()
 
@@ -94,16 +97,12 @@ episode_rewards = []
 episode_next_state = []
 episode_done = []
 
-last_action = None
-hidden_out = None
-def random_action():
-    global last_action, hidden_out
-    last_action = env.action_space.sample()
-    # initialize hidden state for lstm, (hidden, cell), each is (layer, batch, dim)
-    print("Reset hidden state...")
-    hidden_out = (torch.zeros([1, 1, hidden_dim], dtype=torch.float).to(device), \
-        torch.zeros([1, 1, hidden_dim], dtype=torch.float).to(device))
+def get_action(agent, obs, last_action, hidden_in):
+    with torch.no_grad():
+        action, hidden_out = agent.policy_net.get_action(obs, last_action, hidden_in, deterministic=DETERMINISTIC)
+    return action, hidden_out
 
+updated = False
 for episode in range(num_episode):
     print('Episode', episode+1)
     obs, info = env.reset()
@@ -113,17 +112,22 @@ for episode in range(num_episode):
     episode_reward = 0
     epsilon = min_epsilon + (max_epsilon - min_epsilon) * np.exp(-decay_rate * episode)
 
-    # For start of batch == start of episode
-    if len(episode_state) == 0:
-        random_action()
+    # For start of batch
+    last_action = env.action_space.sample()
+    # initialize hidden state for lstm, (hidden, cell), each is (layer, batch, dim)
+    #print("Reset hidden state...")
+    hidden_out = (torch.zeros([1, 1, hidden_dim], dtype=torch.float).to(device),
+                  torch.zeros([1, 1, hidden_dim], dtype=torch.float).to(device))
 
     while True: # Use config["duration"] to truncate
-        #if np.random.rand() < epsilon:
-        #    random_action()
-
         hidden_in = hidden_out
-        action, hidden_out = trainer.policy_net.get_action(obs, last_action, hidden_in, deterministic=DETERMINISTIC)
+
+        if np.random.uniform() < epsilon:
+            action = env.action_space.sample()
+        else:
+            action, hidden_out = get_action(trainer, obs, last_action, hidden_in)
         #print(action)
+
         next_obs, reward, done, truncated, info = env.step(action)
 
         if len(episode_state) == 0:
@@ -141,34 +145,6 @@ for episode in range(num_episode):
         obs = next_obs
         last_action = action
 
-        if len(episode_state) == size_per_batch:
-            # Push to replay buffer
-            print("Push to replay buffer...")
-            replay_buffer.push(ini_hidden_in, ini_hidden_out, episode_state, episode_action, episode_last_action, \
-                episode_rewards, episode_next_state, episode_done)
-            # Reset - note: point to new empty list
-            episode_state = []
-            episode_action = []
-            episode_last_action = []
-            episode_rewards = []
-            episode_next_state = []
-            episode_done = []
-            # Randomly reset hidden state for next batch
-            if np.random.rand() < epsilon:
-                random_action()
-
-        # Minimum interval between update
-        min_buff_len = size_per_batch / update_interval_steps * batch_size
-        auto_interval = update_interval_steps if len(replay_buffer) >= min_buff_len else size_per_batch
-        if len(replay_buffer) > batch_size and last_update_step >= auto_interval:
-            # Update agent
-            for i in range(update_itr):
-                print("Update SAC-LSTM...")
-                trainer.update(batch_size, reward_scale=10., auto_entropy=AUTO_ENTROPY, target_entropy=-1.*action_dim)
-            last_update_step = 0
-        else:
-            last_update_step += 1
-
         num_steps += 1
         episode_reward += reward
         #env.render() # Note: Do not render during training
@@ -176,6 +152,47 @@ for episode in range(num_episode):
         if done or truncated:
             env_perf = env.get_performance()
             break
+
+    #print('Push to replay buffer...')
+    replay_buffer.push(
+        ini_hidden_in,
+        ini_hidden_out,
+        episode_state,
+        episode_action,
+        episode_last_action,
+        episode_rewards,
+        episode_next_state,
+        episode_done)
+    # Reset - note: point to new empty list
+    episode_state = []
+    episode_action = []
+    episode_last_action = []
+    episode_rewards = []
+    episode_next_state = []
+    episode_done = []
+
+    # Minimum interval between update
+    if len(replay_buffer) >= min_batch_size and non_update_episode_count >= update_interval_episode:
+        batch_size = min(int(len(replay_buffer) / 2), max_batch_size)
+        min_seq_size = int(episode / min_seq_size_ep_interval)
+        if min_seq_size >= len(min_seq_sizes):
+            min_seq_size = max(min_seq_sizes)
+        else:
+            min_seq_size = min_seq_sizes[min_seq_size]
+        # Update agent
+        for i in range(update_itr):
+            print("Update SAC-LSTM... Batch size:", batch_size, "Min sequence length:", min_seq_size)
+            updated = trainer.update(batch_size, reward_scale=10., auto_entropy=AUTO_ENTROPY, target_entropy=-1.*action_dim,
+                                     min_seq_size=min_seq_size) or updated
+            print('Sampled min sequence len:', trainer.min_seq_len)
+        if updated:
+            non_update_episode_count = 0
+            updated = False
+        else:
+            print('Min sequence length not fulfilled.')
+            non_update_episode_count += 1
+    else:
+        non_update_episode_count += 1
 
     end_time = time.time()
 

@@ -55,24 +55,33 @@ class SAC_Trainer():
         self.policy_optimizer = optim.Adam(self.policy_net.parameters(), lr=policy_lr)
         self.alpha_optimizer = optim.Adam([self.log_alpha], lr=alpha_lr)
 
-    
-    def update(self, batch_size, reward_scale=10., auto_entropy=True, target_entropy=-2, gamma=0.99,soft_tau=1e-2):
+    def _trim_arrays(self, arrays, min_len=None):
+        if min_len is None:
+            min_len = min(len(a) for a in arrays)
+        return [a[:min_len] for a in arrays], min_len
+
+    def update(self, batch_size, reward_scale=10., auto_entropy=True, target_entropy=-2, gamma=0.99,soft_tau=1e-2, min_seq_size=None):
         hidden_in, hidden_out, state, action, last_action, reward, next_state, done = self.replay_buffer.sample(batch_size)
         # print('sample:', state, action,  reward, done)
 
+        state, min_len = self._trim_arrays(state)
+        self.min_seq_len = min_len
+        if min_seq_size is not None and min_len < min_seq_size:
+            return False
+
         state      = torch.FloatTensor(np.array(state)).to(device)
-        next_state = torch.FloatTensor(np.array(next_state)).to(device)
-        action     = torch.FloatTensor(np.array(action)).to(device)
-        last_action     = torch.FloatTensor(np.array(last_action)).to(device)
-        reward     = torch.FloatTensor(np.array(reward)).unsqueeze(-1).to(device)  # reward is single value, unsqueeze() to add one dim to be [reward] at the sample dim;
-        done       = torch.FloatTensor(np.float32(done)).unsqueeze(-1).to(device)
+        next_state = torch.FloatTensor(np.array(self._trim_arrays(next_state, min_len)[0])).to(device)
+        action     = torch.FloatTensor(np.array(self._trim_arrays(action, min_len)[0])).to(device)
+        last_action     = torch.FloatTensor(np.array(self._trim_arrays(last_action, min_len)[0])).to(device)
+        reward     = torch.FloatTensor(np.array(self._trim_arrays(reward, min_len)[0])).unsqueeze(-1).to(device)  # reward is single value, unsqueeze() to add one dim to be [reward] at the sample dim;
+        done       = torch.FloatTensor(np.float32(self._trim_arrays(done, min_len)[0])).unsqueeze(-1).to(device)
 
         predicted_q_value1, _ = self.soft_q_net1(state, action, last_action, hidden_in)
         predicted_q_value2, _ = self.soft_q_net2(state, action, last_action, hidden_in)
         new_action, log_prob, z, mean, log_std, _ = self.policy_net.evaluate(state, last_action, hidden_in)
         new_next_action, next_log_prob, _, _, _, _ = self.policy_net.evaluate(next_state, action, hidden_out)
         reward = reward_scale * (reward - reward.mean(dim=0)) / (reward.std(dim=0) + 1e-6) # normalize with batch mean and std; plus a small number to prevent numerical problem
-    # Updating alpha wrt entropy
+        # Updating alpha wrt entropy
         # alpha = 0.0  # trade-off between exploration (max entropy) and exploitation (max Q) 
         if auto_entropy is True:
             alpha_loss = -(self.log_alpha * (log_prob + target_entropy).detach()).mean()
@@ -85,7 +94,7 @@ class SAC_Trainer():
             self.alpha = 1.
             alpha_loss = 0
 
-    # Training Q Function
+        # Training Q Function
         predict_target_q1, _ = self.target_soft_q_net1(next_state, new_next_action, action, hidden_out)
         predict_target_q2, _ = self.target_soft_q_net2(next_state, new_next_action, action, hidden_out)
         target_q_min = torch.min(predict_target_q1, predict_target_q2) - self.alpha * next_log_prob
@@ -101,7 +110,7 @@ class SAC_Trainer():
         q_value_loss2.backward()
         self.soft_q_optimizer2.step()  
 
-    # Training Policy Function
+        # Training Policy Function
         predict_q1, _= self.soft_q_net1(state, new_action, last_action, hidden_in)
         predict_q2, _ = self.soft_q_net2(state, new_action, last_action, hidden_in)
         predicted_new_q_value = torch.min(predict_q1, predict_q2)
@@ -115,7 +124,7 @@ class SAC_Trainer():
         # print('policy loss: ', policy_loss )
 
 
-    # Soft update the target value net
+        # Soft update the target value net
         for target_param, param in zip(self.target_soft_q_net1.parameters(), self.soft_q_net1.parameters()):
             target_param.data.copy_(  # copy data value into target parameters
                 target_param.data * (1.0 - soft_tau) + param.data * soft_tau
@@ -124,7 +133,8 @@ class SAC_Trainer():
             target_param.data.copy_(  # copy data value into target parameters
                 target_param.data * (1.0 - soft_tau) + param.data * soft_tau
             )
-        return predicted_new_q_value.mean()
+        #return predicted_new_q_value.mean()
+        return True
 
     def save_model(self, path):
         torch.save(self.soft_q_net1.state_dict(), path+'_q1')
@@ -143,8 +153,6 @@ class SAC_Trainer():
 
 replay_buffer_size = 1e6
 replay_buffer = ReplayBufferLSTM2(replay_buffer_size)
-
-
 
 # hyper-parameters for RL training
 max_episodes  = 1000
