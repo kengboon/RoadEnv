@@ -1,4 +1,4 @@
-from typing import Dict, Text
+from typing import Dict, Optional, Text
 import numpy as np
 from road_env import utils
 from road_env.envs.common.abstract import AbstractEnv
@@ -272,12 +272,28 @@ class UrbanRoadEnv(AbstractEnv):
         if self.config['duration']:
             return self.time >= self.config['duration']
         return False
-    
+
+    def _info(self, obs, action: Action | None = None) -> dict:
+        info = {
+            "completed": not self.vehicle.on_road and self.vehicle.position[0] >= self.config["road_length"],
+            "collided": self.vehicle.crashed,
+            "off_road": not self.vehicle.on_road,
+            "speed": self.vehicle.velocity[0],
+            "heading": self.vehicle.heading,
+            "position_x": self.vehicle.position[0],
+            "position_y": self.vehicle.position[1],
+            "lane_id": self.vehicle.lane_index[2],
+            "observed_obstacles": self.vehicle.observed_obstacles if hasattr(self.vehicle, "observed_obstacles") else 0,
+            "observed_pedestrians": self.vehicle.observed_pedestrians if hasattr(self.vehicle, "observed_pedestrians") else 0,
+            "pedestrian_crossed": sum(map(lambda x: x.crossed, self.road.pedestrians)),
+        }
+        return info
+
     def get_performance(self):
         # Log last ego vehicle state
         d = {
             "collided": self.vehicle.crashed,
-            "complete": not self.vehicle.on_road and self.vehicle.position[0] >= self.config["road_length"],
+            "completed": not self.vehicle.on_road and self.vehicle.position[0] >= self.config["road_length"],
             "off_road": not self.vehicle.on_road,
             "position": self.vehicle.position,
             "lane_id": self.vehicle.lane_index[2],

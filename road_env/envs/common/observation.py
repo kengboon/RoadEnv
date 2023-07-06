@@ -12,6 +12,7 @@ from road_env.road.lane import AbstractLane
 from road_env.utils import distance_to_circle, Vector
 from road_env.vehicle.controller import MDPVehicle
 from road_env.vehicle.kinematics import Vehicle
+from road_env.vehicle.human import Pedestrian
 
 if TYPE_CHECKING:
     from road_env.envs.common.abstract import AbstractEnv
@@ -698,6 +699,8 @@ class LidarKinematicsObservation(ObservationType):
                                                   distance=self.maximum_range,
                                                   count=None)
         self.reset_observations()
+        self.observer_vehicle.observed_obstacles = 0
+        self.observer_vehicle.observed_pedestrians = 0
         if close_obstacles:
             for obstacle in close_obstacles:
                 # Determine obstruction
@@ -717,6 +720,10 @@ class LidarKinematicsObservation(ObservationType):
         for o in self.observations:
             if o[0] is not None and o[1] is not None:
                 df = pd.DataFrame(o[1].to_dict(self.observer_vehicle), index=[0])[self.features]
+                if isinstance(o[1], Pedestrian):
+                    self.observer_vehicle.observed_pedestrians += 1
+                else:
+                    self.observer_vehicle.observed_obstacles += 1
                 if self.normalize:
                     df = self.normalize_obs(df)
                     obs = np.append(obs, df.values.copy())
