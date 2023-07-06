@@ -1,5 +1,5 @@
 # RoadEnv
-An environment for urban area *autonomous driving* and decision-making - extended from [highway-env](https://github.com/Farama-Foundation/HighwayEnv).
+An environment for urban area *autonomous driving* and decision-making - extended and modified from [highway-env](https://github.com/Farama-Foundation/HighwayEnv).
 
 <p align="center"><img src="https://github.com/kengboon/RoadEnv/assets/5046671/8a9c1c2b-3f62-4266-ab9c-cd0054267f45"/></p>
 
@@ -9,6 +9,7 @@ An environment for urban area *autonomous driving* and decision-making - extende
 
 ### Objective
 - Pedestrian collision avoidance
+- Navigation
 
 ### Observation
 - [Line of sight + kinematics](https://github.com/kengboon/RoadEnv/blob/main/road_env/envs/common/observation.py#L631)
@@ -55,7 +56,7 @@ while not (done or truncated):
 See [more examples](https://github.com/kengboon/RoadEnv/tree/main/scripts).
 
 ## Resources
-- [Documentation of highway-env](http://highway-env.farama.org/)
+- [Documentation of highway-env](https://highway-env.farama.org/)
 - Implementation of RL algorithms by [@quantumiracle](https://github.com/quantumiracle/Popular-RL-Algorithms)
 
 ## Citation
