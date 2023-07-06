@@ -41,8 +41,20 @@ trainer = SAC_Trainer(
 
 from datetime import datetime
 model_type = "sac_v2_lstm"
-train_id = datetime.now().strftime("%y%m%d%H%M%S")
-model_dir = "models/" + model_type + "-" + train_id
+continue_train = True
+if continue_train:
+    train_id = "230705191035" # Put the train_id and episode here !!!
+    episode = "10000"
+    model_dir = "../../data/models/" + model_type + "-" + train_id
+    trainer.load_model(model_dir + "/" + episode)
+    trainer.policy_net.train()
+    trainer.soft_q_net1.train()
+    trainer.soft_q_net2.train()
+    episode = int(episode)
+else:
+    train_id = datetime.now().strftime("%y%m%d%H%M%S")
+    model_dir = "models/" + model_type + "-" + train_id
+    episode = 0
 
 # %% Training
 import csv, os
@@ -69,16 +81,16 @@ DETERMINISTIC = False
 max_epsilon = 0.5
 min_epsilon = 0.05
 decay_rate = 0.0005
-num_episode = 10000
+num_episode = 20000
 save_interval = 100
 update_interval_episode = 2
 non_update_episode_count = -1
 batch_size = 2 # Episode
 min_batch_size = 4
-max_batch_size = 16
-sequence_length = 50
-min_seq_len = 10
-update_itr = 1
+max_batch_size = 4
+sequence_length = 25
+min_seq_len = 16
+update_itr = 2
 total_start_time = time.time()
 
 episode_state = []
@@ -94,7 +106,7 @@ def get_action(agent, obs, last_action, hidden_in):
     return action, hidden_out
 
 updated = False
-for episode in range(num_episode):
+while episode < num_episode:
     print('Episode', episode+1)
     obs, info = env.reset()
 
@@ -227,5 +239,6 @@ for episode in range(num_episode):
         save_training_logs(episode+1==save_interval)
         os.makedirs(model_dir, exist_ok=True)
         trainer.save_model(model_dir + "/" + str(episode+1))
+    episode += 1
 
 env.close()
