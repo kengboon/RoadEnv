@@ -104,8 +104,8 @@ class SAC_Trainer():
     def __init__(self, replay_buffer, state_space, action_space, hidden_dim, action_range):
         self.replay_buffer = replay_buffer
 
-        self.q_net = DoubleQNetworkLSTMShare(state_space, action_space, hidden_dim)
-        self.target_q_net = DoubleQNetworkLSTMShare(state_space, action_space, hidden_dim)
+        self.q_net = DoubleQNetworkLSTMShare(state_space, action_space, hidden_dim).to(device)
+        self.target_q_net = DoubleQNetworkLSTMShare(state_space, action_space, hidden_dim).to(device)
         self.policy_net = SAC_PolicyNetworkLSTM(state_space, action_space, hidden_dim, action_range).to(device)
         self.log_alpha = torch.zeros(1, dtype=torch.float32, requires_grad=True, device=device)
         print('Soft Q Network-LSTM: ', self.q_net)
