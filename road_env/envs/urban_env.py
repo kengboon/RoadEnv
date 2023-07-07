@@ -100,25 +100,29 @@ class UrbanRoadEnv(AbstractEnv):
         self._make_pedestrians()
 
     def _preset_mode(self) -> None:
+        road_length = self.config["road_length"]
+        road_length = road_length / 500 # Get a ratio where longer road have more objects
+        if self.config["obstacle_preset"]:
+            self.config["pedestrians"]["count"] = int(20 * road_length)
         match self.config["obstacle_preset"]:
             case 1: # Low occlusion
                 self.configure({
-                    "obstacle_count": 10,
+                    "obstacle_count": int(10 * road_length),
                     "obstacle_size": 0.75
                 })
             case 2: # Medium occlusion
                 self.configure({
-                    "obstacle_count": 25,
+                    "obstacle_count": int(25 * road_length),
                     "obstacle_size": 1.5
                 })
             case 3: # High occlusion
                 self.configure({
-                    "obstacle_count": 50,
+                    "obstacle_count": int(50 * road_length),
                     "obstacle_size": 1.75
                 })
             case 4: # Random level
                 self.configure({
-                    "obstacle_count": self._generator.integers(10, 50),
+                    "obstacle_count": int(self._generator.integers(10, 50) * road_length),
                     "obstacle_size": None
                 })
 
