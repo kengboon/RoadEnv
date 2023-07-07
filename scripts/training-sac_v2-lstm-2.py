@@ -116,7 +116,7 @@ while episode < num_episode:
     epsilon = min_epsilon + (max_epsilon - min_epsilon) * np.exp(-decay_rate * episode)
 
     # For start of batch
-    last_action = env.action_space.sample()
+    last_action = np.zeros(env.action_space.shape)
     # initialize hidden state for lstm, (hidden, cell), each is (layer, batch, dim)
     #print("Reset hidden state...")
     hidden_out = (torch.zeros([1, 1, hidden_dim], dtype=torch.float).to(device),
