@@ -104,6 +104,10 @@ road_length = 1000
 render=True
 print(f'Test ID: {test_id}')
 
+env.configure({
+    "road_length": road_length
+})
+
 for occ in OCCLUSION:
     print(occ)
     info = run_eval(env, occ, agent,
