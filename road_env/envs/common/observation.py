@@ -667,9 +667,8 @@ class LidarKinematicsObservation(ObservationType):
         self.display_grid = display_grid
         self.display_line = display_line
         self.display_unobserved = display_unobserved
-        self.angle = np.pi
-        if self.see_behind:
-            self.angle *= 2
+        #if self.see_behind:
+        #    self.angle *= 2
         self.reset_observations()
 
     def space(self) -> spaces.Space:
@@ -757,7 +756,7 @@ class LidarKinematicsObservation(ObservationType):
                 "heading": [-np.pi, np.pi],
                 "distance": [0, self.maximum_range],
                 "front_distance": [0, self.maximum_range],
-                "front_angle": [-self.angle / 2, self.angle / 2]
+                "front_angle": self.observe_angle
             }
         for feature, f_range in self.features_range.items():
             if feature in df:
@@ -776,7 +775,7 @@ class LidarKinematicsObservation(ObservationType):
         return np.arctan2(dy, dx) - origin.heading
 
     def angle_to_index(self, angle: float) -> int:
-        return int(utils.lmap(angle, [-self.angle / 2, self.angle / 2], [0, self.cells-1]))
+        return int(utils.lmap(angle, self.observe_angle, [0, self.cells-1]))
 
 def observation_factory(env: 'AbstractEnv', config: dict) -> ObservationType:
     if config["type"] == "TimeToCollision":
