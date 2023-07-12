@@ -1,3 +1,5 @@
+<a href="https://huggingface.co/kengboon/rsac-RoadEnv" target="_blank"><img src="https://img.shields.io/badge/weights-rsac%96RoadEnv-yellow"/></a>
+
 # RoadEnv
 An environment for urban area *autonomous driving* and decision-making - extended and modified from [highway-env](https://github.com/Farama-Foundation/HighwayEnv).
 
