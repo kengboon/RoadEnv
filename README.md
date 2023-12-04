@@ -1,4 +1,10 @@
-<a href="https://huggingface.co/kengboon/rsac-RoadEnv" target="_blank"><img src="https://img.shields.io/badge/weights-rsac%96RoadEnv-yellow"/></a>
+The repository contains code used for my Master's thesis _(Teo, 2023, "Recurrent Soft Actor-Critic (RSAC) Algorithm for Pedestrian Collision Avoidance in Occlusion Scenarios," Universiti Sains Malaysia, School of Computer Sciences, supervised by Dr. Fadratul Hafinaz Hassan)_.
+
+If you are using the software, please cite it using [this metadata](https://github.com/kengboon/RoadEnv/blob/main/CITATION.cff).
+
+<a href="https://github.com/kengboon/RoadEnv" target="_blank"><img src="https://img.shields.io/badge/code-RoadEnv-blue"/></a> <a href="https://huggingface.co/kengboon/rsac-RoadEnv" target="_blank"><img src="https://img.shields.io/badge/weights-rsac--RoadEnv-yellow"/></a>
+
+---
 
 # RoadEnv
 An environment for urban area *autonomous driving* and decision-making - extended and modified from [highway-env](https://github.com/Farama-Foundation/HighwayEnv).
@@ -62,6 +68,17 @@ See [more examples](https://github.com/kengboon/RoadEnv/tree/main/scripts).
 - Implementation of RL algorithms by [@quantumiracle](https://github.com/quantumiracle/Popular-RL-Algorithms)
 
 ## Citation
+View [CITATION.cff](https://github.com/kengboon/RoadEnv/blob/main/CITATION.cff).
+
+```BibTeX
+@software{Teo_RoadEnv,
+    author = {Teo, Keng Boon},
+    license = {MIT},
+    title = {{RoadEnv}},
+    url = {https://github.com/kengboon/RoadEnv}
+}
+```
+
 
 ## Buy me a ☕
 <a href="https://ko-fi.com/woolf42" target="_blank"><img src="https://user-images.githubusercontent.com/5046671/197377067-ce6016ae-6368-47b6-a4eb-903eb7b0af9c.png" width="200" alt="Support me on Ko-fi"/></a>
