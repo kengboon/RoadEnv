@@ -1,0 +1,25 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: RoadEnv
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Keng Boon
+    family-names: Teo
+    orcid: 'https://orcid.org/0000-0001-8128-1948'
+    affiliation: Universiti Sains Malaysia
+repository-code: 'https://github.com/kengboon/RoadEnv'
+abstract: >-
+  An environment for urban area autonomous driving and
+  decision-making.
+keywords:
+  - reinforcement-learning
+  - deep-reinforcement-learning
+  - autonomous-driving
+  - collision-avoidance
+  - gymnasium-environment
+license: MIT
